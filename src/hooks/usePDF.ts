@@ -1,4 +1,5 @@
 import { PDFDocument } from 'pdf-lib';
+import { encryptPDF } from '@pdfsmaller/pdf-encrypt-lite';
 
 export const usePDF = () => {
   /**
@@ -84,14 +85,11 @@ export const usePDF = () => {
     const arrayBuffer = await file.arrayBuffer();
     const pdfDoc = await PDFDocument.load(arrayBuffer);
     
-    // pdf-lib's save method supports encryption options
-    const encryptedBytes = await pdfDoc.save({
-      useObjectStreams: false, // Recommended for broader compatibility
-      encrypt: {
-        userPassword: password,
-        ownerPassword: password, // You can use a different owner password if needed
-      },
-    });
+    // Save the PDF without encryption to get a clean Uint8Array
+    const pdfBytes = await pdfDoc.save();
+
+    // Use the external library for encryption
+    const encryptedBytes = await encryptPDF(pdfBytes, password);
 
     return encryptedBytes;
   };
