@@ -5,6 +5,10 @@ on:
     branches:
       - main # or master
 
+defaults:
+  run:
+    working-directory: av_pdf-toolbox # Set the working directory for all steps
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -17,6 +21,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20' # Specify Node.js version 20
+          cache: 'npm'
+          cache-dependency-path: 'av_pdf-toolbox/package-lock.json' # Cache dependencies for the subfolder
 
       - name: Install dependencies
         run: npm install
@@ -27,7 +33,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './dist' # Path to your build output directory
+          path: './dist' # Path is relative to the working-directory set above
 
       - name: Deploy to GitHub Pages
         id: deployment
