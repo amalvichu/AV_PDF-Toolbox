@@ -48,7 +48,8 @@ export const SplitTool: React.FC = () => {
     setIsProcessing(true);
     try {
       const splitPdf = await splitPDF(file, range);
-      downloadBlob(splitPdf, `split-${Date.now()}.pdf`);
+      const originalFileName = file.name.split('.').slice(0, -1).join('.');
+      downloadBlob(splitPdf, `${originalFileName}-split.pdf`);
     } catch (error) {
       console.error('Error splitting PDF:', error);
       alert('An error occurred while splitting the PDF. Please check the page range and file integrity.');

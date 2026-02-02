@@ -30,7 +30,8 @@ export const ProtectTool: React.FC = () => {
     setIsProcessing(true);
     try {
       const protectedPdf = await protectPDF(file, password);
-      downloadBlob(protectedPdf, `protected-${Date.now()}.pdf`);
+      const originalFileName = file.name.split('.').slice(0, -1).join('.');
+      downloadBlob(protectedPdf, `${originalFileName}-protected.pdf`);
     } catch (error) {
       console.error('Error protecting PDF:', error);
       alert('An error occurred while protecting the PDF.');

@@ -94,5 +94,58 @@ export const usePDF = () => {
     return encryptedBytes;
   };
 
-  return { mergePDFs, splitPDF, downloadBlob, protectPDF };
+  /**
+   * Converts multiple image files into a single PDF.
+   * Supports JPEG and PNG images. Each image will be placed on its own page.
+   * @param files - An array of image File objects (JPEG or PNG).
+   * @returns A Promise that resolves with a Uint8Array of the new PDF.
+   */
+  const imagesToPDF = async (files: File[]): Promise<Uint8Array> => {
+    const pdfDoc = await PDFDocument.create();
+
+    for (const file of files) {
+      const arrayBuffer = await file.arrayBuffer();
+      let image;
+      let imgDim;
+
+      if (file.type === 'image/jpeg') {
+        image = await pdfDoc.embedJpg(arrayBuffer);
+        imgDim = image.scale(1); // Get original dimensions
+      } else if (file.type === 'image/png') {
+        image = await pdfDoc.embedPng(arrayBuffer);
+        imgDim = image.scale(1); // Get original dimensions
+      } else {
+        console.warn(`Skipping unsupported image type: ${file.type}`);
+        continue;
+      }
+
+      // Add a blank page to the document
+      const page = pdfDoc.addPage();
+      const { width, height } = page.getSize();
+
+      // Calculate scale to fit image to page
+      const scaleX = width / imgDim.width;
+      const scaleY = height / imgDim.height;
+      const scale = Math.min(scaleX, scaleY);
+
+      // Scale image dimensions
+      const scaledWidth = imgDim.width * scale;
+      const scaledHeight = imgDim.height * scale;
+
+      // Center the image on the page
+      const x = (width - scaledWidth) / 2;
+      const y = (height - scaledHeight) / 2;
+
+      page.drawImage(image, {
+        x,
+        y,
+        width: scaledWidth,
+        height: scaledHeight,
+      });
+    }
+
+    return await pdfDoc.save();
+  };
+
+  return { mergePDFs, splitPDF, downloadBlob, protectPDF, imagesToPDF };
 };

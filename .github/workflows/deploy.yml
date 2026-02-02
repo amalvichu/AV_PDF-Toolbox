@@ -2,39 +2,49 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches:
-      - main # or master
+    branches: [main]
 
-defaults:
-  run:
-    working-directory: av_pdf-toolbox # Set the working directory for all steps
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-
+    defaults:
+      run:
+        working-directory: av_pdf-toolbox # Tell GitHub your project is here
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20' # Specify Node.js version 20
+          node-version: 20
           cache: 'npm'
-          cache-dependency-path: 'av_pdf-toolbox/package-lock.json' # Cache dependencies for the subfolder
+          # Path to lock file for caching
+          cache-dependency-path: av_pdf-toolbox/package-lock.json
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install and Build
+        run: |
+          npm install
+          npm run build
 
-      - name: Build project
-        run: npm run build
-
-      - name: Upload Pages artifact
+      - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './dist' # Path is relative to the working-directory set above
+          # Point to the dist folder inside your tool folder
+          path: av_pdf-toolbox/dist
 
-      - name: Deploy to GitHub Pages
+  deploy:
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4

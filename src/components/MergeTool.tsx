@@ -40,7 +40,7 @@ export const MergeTool: React.FC = () => {
     setIsProcessing(true);
     try {
       const mergedPdf = await mergePDFs(files);
-      downloadBlob(mergedPdf, `merged-${Date.now()}.pdf`);
+      downloadBlob(mergedPdf, `merged-pdfs-${Date.now()}.pdf`);
     } catch (error) {
       console.error('Error merging PDFs:', error);
       alert('An error occurred while merging the PDFs.');
