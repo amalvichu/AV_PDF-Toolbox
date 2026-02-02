@@ -8,7 +8,6 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Explicitly defining colors for clarity and direct Tailwind class generation
         'slate-950': '#020617', // Background
         'slate-900': '#0f172a', // Cards/Elements
         'slate-800': '#1e293b',
@@ -18,4 +17,5 @@ export default {
       },
     },
   },
+  plugins: [], // Removed tailwindcss-animate to avoid build errors
 };
