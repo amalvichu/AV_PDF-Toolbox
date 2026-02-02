@@ -3,5 +3,5 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  base: '/AV_PDF-Toolbox/', // Set base path for GitHub Pages, assuming repo name is AV_PDF-Toolbox
+  base: '/psnl_tools/', // Set base path for GitHub Pages, assuming project is hosted in /psnl_tools/ subfolder
 });
