@@ -12,9 +12,6 @@ permissions:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: av_pdf-toolbox # Tell GitHub your project is here
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,8 +21,8 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-          # Path to lock file for caching
-          cache-dependency-path: av_pdf-toolbox/package-lock.json
+          # Path to lock file for caching - now relative to repo root
+          cache-dependency-path: ./package-lock.json
 
       - name: Install and Build
         run: |
@@ -35,8 +32,8 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Point to the dist folder inside your tool folder
-          path: av_pdf-toolbox/dist
+          # Path to build output directory - now relative to repo root
+          path: ./dist
 
   deploy:
     needs: build-and-deploy
