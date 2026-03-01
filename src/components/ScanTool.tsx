@@ -61,16 +61,20 @@ export const ScanTool: React.FC = () => {
     });
 
     newPeer.on('connection', (conn) => {
-      // Laptop sees the phone!
-      setConnectionStatus('connected');
-      setShowQR(false); 
-
-      conn.on('data', (data: any) => {
-        if (data.file) {
-          const blob = new Blob([data.file], { type: data.type });
-          const preview = URL.createObjectURL(blob);
-          setScannedPages(prev => [...prev, { blob, preview }]);
-        }
+      conn.on('open', () => {
+        // Wait for the phone to send a 'READY' ping
+        conn.on('data', (data: any) => {
+          if (data.type === 'verification-ping') {
+            // Send back a 'PONG'
+            conn.send({ type: 'verification-pong' });
+            setConnectionStatus('connected');
+            setShowQR(false);
+          } else if (data.file) {
+            const blob = new Blob([data.file], { type: data.type });
+            const preview = URL.createObjectURL(blob);
+            setScannedPages(prev => [...prev, { blob, preview }]);
+          }
+        });
       });
 
       conn.on('close', () => setConnectionStatus('waiting'));
