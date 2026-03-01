@@ -41,65 +41,61 @@ export const ScanTool: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { imagesToPDF, downloadBlob } = usePDF();
 
-  // Initialize Peer on Mount
+  // Persistent Peer initialization
   useEffect(() => {
-    const initPeer = () => {
-      // Explicit configuration to ensure both devices use the same signaling server
-      const newPeer = new Peer({
-        host: '0.peerjs.com',
-        port: 443,
-        secure: true,
-        debug: 3,
-        config: {
-          'iceServers': [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
-          ]
+    if (peer) return; // Don't re-init if already exists
+
+    const newPeer = new Peer({
+      host: '0.peerjs.com',
+      port: 443,
+      secure: true,
+      debug: 1,
+      config: {
+        'iceServers': [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
+        ]
+      }
+    });
+    
+    newPeer.on('open', (id) => {
+      setPeerId(id);
+      setConnectionStatus('waiting');
+    });
+
+    newPeer.on('connection', (conn) => {
+      conn.on('open', () => {
+        setConnectionStatus('connected');
+        setShowQR(false);
+      });
+
+      conn.on('data', (data: any) => {
+        if (data.file) {
+          const blob = new Blob([data.file], { type: data.type });
+          const preview = URL.createObjectURL(blob);
+          setScannedPages(prev => [...prev, { blob, preview }]);
         }
       });
-      
-      newPeer.on('open', (id) => {
-        setPeerId(id);
-        setConnectionStatus('waiting');
-      });
 
-      newPeer.on('connection', (conn) => {
-        conn.on('open', () => {
-          setConnectionStatus('connected');
-          setShowQR(false);
-        });
+      conn.on('close', () => setConnectionStatus('waiting'));
+    });
 
-        conn.on('data', (data: any) => {
-          if (data.file) {
-            const blob = new Blob([data.file], { type: data.type });
-            const preview = URL.createObjectURL(blob);
-            setScannedPages(prev => [...prev, { blob, preview }]);
-          }
-        });
-
-        conn.on('close', () => setConnectionStatus('waiting'));
-        conn.on('error', (err) => console.error('Peer connection error:', err));
-      });
-
-      newPeer.on('error', (err) => console.error('PeerJS error:', err));
-
-      setPeer(newPeer);
-    };
-
-    if (showQR || connectionStatus === 'disconnected') {
-      initPeer();
-    }
+    setPeer(newPeer);
 
     return () => {
-      if (peer) peer.destroy();
+      // Keep it alive during the session, only destroy on unmount
     };
-  }, [showQR]); 
+  }, []); 
 
   const getMobileUrl = () => {
     if (!peerId) return '';
+    // Use the absolute public URL to ensure mobile compatibility
     const baseUrl = window.location.origin + window.location.pathname;
     const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-    // Ensure the ID is properly encoded
     return `${cleanBaseUrl}?mode=mobile-sender&hostId=${encodeURIComponent(peerId)}`;
   };
 

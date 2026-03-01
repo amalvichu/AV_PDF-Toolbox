@@ -61,10 +61,14 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
       host: '0.peerjs.com',
       port: 443,
       secure: true,
-      debug: 3,
+      debug: 1,
       config: {
         'iceServers': [
           { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' },
           { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
         ]
       }
