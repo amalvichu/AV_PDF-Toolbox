@@ -41,11 +41,15 @@ export const ScanTool: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { imagesToPDF, downloadBlob } = usePDF();
 
+  const [connectionLog, setConnectionLog] = useState<string>('Initializing server...');
+
   // Initialize Peer on Mount
   useEffect(() => {
-    // Longer, more unique ID to avoid collisions on the public server
-    const id = 'AVPDF-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+    const id = 'AVPDF-' + Math.random().toString(36).substr(2, 6).toUpperCase();
     const newPeer = new Peer(id, {
+      host: '0.peerjs.com',
+      port: 443,
+      secure: true,
       debug: 1,
       config: {
         iceServers: [
@@ -58,16 +62,19 @@ export const ScanTool: React.FC = () => {
     newPeer.on('open', (id) => {
       setPeerId(id);
       setConnectionStatus('waiting');
+      setConnectionLog('Server Ready. Waiting for phone...');
     });
 
     newPeer.on('connection', (conn) => {
+      setConnectionLog('Phone detected! Verifying link...');
+      
       conn.on('open', () => {
-        // Wait for the phone to send a 'READY' ping
+        // Laptop sees the phone's data channel
         conn.on('data', (data: any) => {
           if (data.type === 'verification-ping') {
-            // Send back a 'PONG'
             conn.send({ type: 'verification-pong' });
             setConnectionStatus('connected');
+            setConnectionLog('Link Secured!');
             setShowQR(false);
           } else if (data.file) {
             const blob = new Blob([data.file], { type: data.type });
@@ -77,19 +84,29 @@ export const ScanTool: React.FC = () => {
         });
       });
 
-      conn.on('close', () => setConnectionStatus('waiting'));
+      conn.on('close', () => {
+        setConnectionStatus('waiting');
+        setConnectionLog('Phone disconnected.');
+      });
+
+      conn.on('error', (err) => {
+        setConnectionLog('Link error: ' + err.type);
+      });
+    });
+
+    newPeer.on('error', (err) => {
+        setConnectionLog('Server error: ' + err.type);
     });
 
     setPeer(newPeer);
     return () => newPeer.destroy();
   }, []); 
 
-  const getMobileUrl = () => {
-    if (!peerId) return '';
-    const baseUrl = window.location.origin + window.location.pathname;
-    const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-    return `${cleanBaseUrl}?mode=mobile-sender&hostId=${encodeURIComponent(peerId)}`;
-  };
+  // ... (inside the QR Modal UI part) ...
+              <div className="bg-slate-800/50 p-3 rounded-xl mb-6 text-left border border-slate-700">
+                <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Status Log</p>
+                <p className="text-xs text-blue-400 font-mono">{connectionLog}</p>
+              </div>
 
   const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {

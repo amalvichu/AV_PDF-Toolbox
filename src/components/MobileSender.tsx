@@ -46,6 +46,9 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
   // Initialize Peer and Handshake
   useEffect(() => {
     const newPeer = new Peer({
+      host: '0.peerjs.com',
+      port: 443,
+      secure: true,
       debug: 1,
       config: {
         iceServers: [
@@ -59,22 +62,33 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
       const activeConn = newPeer.connect(hostId, { reliable: true });
       
       activeConn.on('open', () => {
-        // Step 1: Send a verification ping
-        activeConn.send({ type: 'verification-ping' });
+        // Step 1: Start an aggressive ping loop
+        const pingInterval = setInterval(() => {
+            if (status !== 'connected') {
+                activeConn.send({ type: 'verification-ping' });
+            } else {
+                clearInterval(pingInterval);
+            }
+        }, 1000);
         
         // Step 2: Wait for laptop to say 'verification-pong'
         activeConn.on('data', (data: any) => {
           if (data.type === 'verification-pong') {
+            clearInterval(pingInterval);
             setConn(activeConn);
             setStatus('connected');
             setStatusMsg('Ready to scan');
           }
         });
+
+        // Cleanup on unmount or close
+        return () => clearInterval(pingInterval);
       });
 
-      activeConn.on('error', () => {
+      activeConn.on('error', (err) => {
+        console.error('Mobile Connection Error:', err);
         setStatus('error');
-        setStatusMsg('Link failed. Is laptop open?');
+        setStatusMsg('Link failed. Rescan QR.');
       });
     });
 
