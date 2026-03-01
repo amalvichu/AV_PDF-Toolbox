@@ -43,17 +43,11 @@ export const ScanTool: React.FC = () => {
 
   // Initialize Peer on Mount
   useEffect(() => {
-    const id = uuidv4().split('-')[0];
+    const id = Math.random().toString(36).substr(2, 6).toUpperCase(); // Short 6-char ID
     const newPeer = new Peer(id, {
-      host: '0.peerjs.com',
-      port: 443,
-      secure: true,
       debug: 1,
       config: {
-        'iceServers': [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
-        ]
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
       }
     });
     
@@ -63,35 +57,33 @@ export const ScanTool: React.FC = () => {
     });
 
     newPeer.on('connection', (conn) => {
-      setConnectionStatus('connected');
-      setShowQR(false); 
-      
+      conn.on('open', () => {
+        setConnectionStatus('connected');
+        setShowQR(false); 
+      });
+
       conn.on('data', (data: any) => {
         if (data.file) {
           const blob = new Blob([data.file], { type: data.type });
           const preview = URL.createObjectURL(blob);
           setScannedPages(prev => [...prev, { blob, preview }]);
+          // Auto-reconnect safety
+          setConnectionStatus('connected');
         }
       });
 
-      conn.on('close', () => {
-        setConnectionStatus('waiting');
-      });
+      conn.on('close', () => setConnectionStatus('waiting'));
     });
 
     setPeer(newPeer);
-
-    return () => {
-      newPeer.destroy();
-    };
+    return () => newPeer.destroy();
   }, []); 
 
   const getMobileUrl = () => {
     if (!peerId) return '';
     const baseUrl = window.location.origin + window.location.pathname;
     const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-    // Ensure the ID is properly encoded for the URL
-    return `${cleanBaseUrl}?mode=mobile-sender&hostId=${encodeURIComponent(peerId)}`;
+    return `${cleanBaseUrl}?mode=mobile-sender&hostId=${peerId}`;
   };
 
   const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {

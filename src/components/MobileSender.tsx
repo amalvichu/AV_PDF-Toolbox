@@ -17,55 +17,73 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
 
   // Initialize Peer
   useEffect(() => {
-    const newPeer = new Peer({
-      host: '0.peerjs.com',
-      port: 443,
-      secure: true,
-      debug: 1,
-      config: {
-        'iceServers': [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
-        ]
-      }
-    });
+    const newPeer = new Peer();
     setPeer(newPeer);
-    
-    newPeer.on('open', () => {
-      setStatus('idle');
-      // Pre-connect for speed, but don't block UI
-      const connection = newPeer.connect(hostId, { reliable: true });
-      connection.on('open', () => setConn(connection));
-    });
-
     return () => newPeer.destroy();
-  }, [hostId]);
+  }, []);
+
+  const compressImage = async (file: File): Promise<Blob> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > MAX_WIDTH) {
+          height *= MAX_WIDTH / width;
+          width = MAX_WIDTH;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob((blob) => {
+          resolve(blob || file);
+        }, 'image/jpeg', 0.7); // Compress to 70% quality
+      };
+    });
+  };
 
   const sendFile = async (file: File) => {
     if (!peer) return;
 
     setStatus('sending');
-    setStatusMsg(`Sending ${file.name}...`);
+    setStatusMsg('Compressing & Sending...');
 
     try {
-      // Get or Create Connection
+      const compressedBlob = await compressImage(file);
+      
       let activeConn = conn;
       if (!activeConn || !activeConn.open) {
-        activeConn = peer.connect(hostId, { reliable: true });
+        activeConn = peer.connect(hostId, { reliable: false }); // Fast mode
         await new Promise((resolve, reject) => {
-          // Increased timeout for mobile networks (12 seconds)
-          const timeout = setTimeout(() => reject('Connection timed out'), 12000);
-          activeConn.on('open', () => {
-            clearTimeout(timeout);
-            setConn(activeConn);
-            resolve(true);
-          });
-          activeConn.on('error', (err: any) => {
-             clearTimeout(timeout);
-             reject(err);
-          });
+          const t = setTimeout(() => reject('Timeout'), 10000);
+          activeConn.on('open', () => { clearTimeout(t); resolve(true); });
+          activeConn.on('error', reject);
         });
+        setConn(activeConn);
       }
+
+      activeConn.send({
+        file: compressedBlob,
+        filename: file.name,
+        type: 'image/jpeg'
+      });
+      
+      setStatus('success');
+      setStatusMsg('Sent!');
+      setTimeout(() => setStatus('idle'), 2000);
+    } catch (err) {
+      setStatus('error');
+      setStatusMsg('Link failed. Try again.');
+      setTimeout(() => setStatus('idle'), 3000);
+    }
+  };
 
       // Send Data
       const reader = new FileReader();
