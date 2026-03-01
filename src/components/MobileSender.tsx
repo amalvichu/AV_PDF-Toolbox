@@ -94,31 +94,39 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
     }
     processAndSend(file, conn);
   };
+const processAndSend = async (file: File, activeConn: any) => {
+  setStatus('sending');
+  setStatusMsg('Compressing & Sending...');
 
-  const processAndSend = async (file: File, activeConn: any) => {
-    setStatus('sending');
-    setStatusMsg('Compressing & Sending...');
+  try {
+    const compressedBlob = await compressImage(file);
 
-    try {
-      const compressedBlob = await compressImage(file);
-      activeConn.send({
-        file: compressedBlob,
-        filename: file.name,
-        type: 'image/jpeg'
-      });
-      
+    // Convert Blob to ArrayBuffer for faster P2P transfer on mobile
+    const arrayBuffer = await compressedBlob.arrayBuffer();
+
+    activeConn.send({
+      file: arrayBuffer,
+      filename: file.name,
+      type: 'image/jpeg'
+    });
+
+    // Small delay to ensure buffer starts clearing
+    setTimeout(() => {
       setStatus('success');
-      setStatusMsg('Sent!');
+      setStatusMsg('Sent successfully!');
       setTimeout(() => {
         setStatus('connected');
         setStatusMsg('Ready to scan');
       }, 2000);
-    } catch (err) {
-      setStatus('error');
-      setStatusMsg('Failed to send.');
-      setTimeout(() => setStatus('connected'), 3000);
-    }
-  };
+    }, 500);
+
+  } catch (err) {
+    console.error('Send error:', err);
+    setStatus('error');
+    setStatusMsg('Failed to send.');
+    setTimeout(() => setStatus('connected'), 3000);
+  }
+};
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
