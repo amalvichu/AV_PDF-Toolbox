@@ -79,32 +79,9 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
       setStatusMsg('Sent!');
       setTimeout(() => setStatus('idle'), 2000);
     } catch (err) {
-      setStatus('error');
-      setStatusMsg('Link failed. Try again.');
-      setTimeout(() => setStatus('idle'), 3000);
-    }
-  };
-
-      // Send Data
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const blob = new Blob([new Uint8Array(e.target?.result as ArrayBuffer)], { type: file.type });
-        activeConn.send({
-          file: blob,
-          filename: file.name,
-          type: file.type
-        });
-        
-        setStatus('success');
-        setStatusMsg('Sent successfully!');
-        setTimeout(() => setStatus('idle'), 2000);
-      };
-      reader.readAsArrayBuffer(file);
-
-    } catch (err) {
       console.error('Send Error:', err);
       setStatus('error');
-      setStatusMsg('Failed to send. Is the laptop tool open?');
+      setStatusMsg('Link failed. Try again.');
       setTimeout(() => setStatus('idle'), 3000);
     }
   };
