@@ -43,24 +43,34 @@ export const ScanTool: React.FC = () => {
 
   // Initialize Peer on Mount
   useEffect(() => {
-    const id = uuidv4();
-    // Using default PeerJS cloud server (safe, P2P, works across networks)
-    const newPeer = new Peer(id, {
-      debug: 1
+    // Let PeerJS assign a random ID for better stability
+    const newPeer = new Peer({
+      debug: 2,
+      config: {
+        'iceServers': [
+          { url: 'stun:stun.l.google.com:19302' },
+          { url: 'stun:stun1.l.google.com:19302' }
+        ]
+      }
     });
     
     newPeer.on('open', (id) => {
+      console.log('Laptop Peer ID:', id);
       setPeerId(id);
       setConnectionStatus('waiting');
     });
 
     newPeer.on('connection', (conn) => {
-      setConnectionStatus('connected');
-      setShowQR(false); // Close QR modal on connection
+      console.log('Incoming connection from phone...');
       
+      conn.on('open', () => {
+        console.log('Data channel opened with phone!');
+        setConnectionStatus('connected');
+        setShowQR(false);
+      });
+
       conn.on('data', (data: any) => {
         if (data.file) {
-          // Convert array buffer back to blob
           const blob = new Blob([data.file], { type: data.type });
           const preview = URL.createObjectURL(blob);
           setScannedPages(prev => [...prev, { blob, preview }]);
@@ -68,7 +78,12 @@ export const ScanTool: React.FC = () => {
       });
 
       conn.on('close', () => {
+        console.log('Phone disconnected');
         setConnectionStatus('waiting');
+      });
+
+      conn.on('error', (err) => {
+        console.error('Connection error:', err);
       });
     });
 

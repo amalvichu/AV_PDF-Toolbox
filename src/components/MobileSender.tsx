@@ -57,7 +57,15 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
   };
 
   useEffect(() => {
-    const newPeer = new Peer(undefined, { debug: 1 });
+    const newPeer = new Peer({ 
+      debug: 2,
+      config: {
+        'iceServers': [
+          { url: 'stun:stun.l.google.com:19302' },
+          { url: 'stun:stun1.l.google.com:19302' }
+        ]
+      }
+    });
     setPeer(newPeer);
 
     newPeer.on('open', (id) => {
