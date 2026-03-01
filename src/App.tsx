@@ -42,55 +42,6 @@ const toolComponents: Record<Tool, React.FC> = {
   'Scan to PDF': ScanTool,
 };
 
-// --- Main App Component ---
-const App: React.FC = () => {
-  const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
-  const [isMobileMode, setIsMobileMode] = useState(false);
-  const [hostId, setHostId] = useState('');
-
-  const CurrentTool = selectedTool ? toolComponents[selectedTool] : null;
-
-  const handleBack = () => setSelectedTool(null);
-
-  useEffect(() => {
-    const checkMobileMode = () => {
-      const params = new URLSearchParams(window.location.search);
-      const mode = params.get('mode');
-      const id = params.get('hostId');
-
-      if (mode === 'mobile-sender' && id) {
-        setIsMobileMode(true);
-        setHostId(id);
-      } else {
-        setIsMobileMode(false);
-        setHostId('');
-      }
-    };
-
-    checkMobileMode();
-    window.addEventListener('popstate', checkMobileMode);
-    return () => window.removeEventListener('popstate', checkMobileMode);
-  }, []);
-
-  if (isMobileMode) {
-    return <MobileSender hostId={hostId} />;
-  }
-
-  return (
-    <div className="min-h-screen w-full bg-slate-950 p-4 sm:p-8">
-      <AnimatePresence mode="wait">
-        {!selectedTool ? (
-          <Dashboard key="dashboard" onToolSelect={setSelectedTool} />
-        ) : (
-          <ToolView key="tool-view" toolName={selectedTool} onBack={handleBack}>
-            {CurrentTool && <CurrentTool />}
-          </ToolView>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-};
-
 // --- Dashboard Component ---
 interface DashboardProps {
   onToolSelect: (tool: Tool) => void;
@@ -156,5 +107,48 @@ const ToolView: React.FC<ToolViewProps> = ({ toolName, onBack, children }) => (
     </div>
   </motion.div>
 );
+
+// --- Main App Component ---
+const App: React.FC = () => {
+  const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
+  const [isMobileMode, setIsMobileMode] = useState(false);
+  const [hostId, setHostId] = useState('');
+
+  const CurrentTool = selectedTool ? toolComponents[selectedTool] : null;
+
+  const handleBack = () => setSelectedTool(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode');
+    const id = params.get('hostId');
+
+    if (mode === 'mobile-sender' && id) {
+      setIsMobileMode(true);
+      setHostId(id);
+    } else {
+      setIsMobileMode(false);
+      setHostId('');
+    }
+  }, []); // Only run once on mount
+
+  if (isMobileMode) {
+    return <MobileSender hostId={hostId} />;
+  }
+
+  return (
+    <div className="min-h-screen w-full bg-slate-950 p-4 sm:p-8">
+      <AnimatePresence mode="wait">
+        {!selectedTool ? (
+          <Dashboard key="dashboard" onToolSelect={setSelectedTool} />
+        ) : (
+          <ToolView key="tool-view" toolName={selectedTool} onBack={handleBack}>
+            {CurrentTool && <CurrentTool />}
+          </ToolView>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 export default App;
