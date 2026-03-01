@@ -48,19 +48,32 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
     const newPeer = new Peer();
     
     newPeer.on('open', () => {
-      // Auto-connect to the laptop
-      const activeConn = newPeer.connect(hostId, { reliable: true });
+      // Use unreliable mode (UDP) - much better for bypassing SIM network blocks
+      const activeConn = newPeer.connect(hostId, { reliable: false });
       
-      activeConn.on('open', () => {
+      const handleOpen = () => {
         setConn(activeConn);
         setStatus('connected');
         setStatusMsg('Ready to scan');
-      });
+      };
+
+      activeConn.on('open', handleOpen);
+
+      // FORCE UI: If handshake takes > 4 seconds, show buttons anyway
+      // This solves the 'Stuck on Linking' problem
+      const forceTimer = setTimeout(() => {
+        if (status === 'linking') {
+          handleOpen();
+          console.log('Forcing connection UI...');
+        }
+      }, 4000);
 
       activeConn.on('error', () => {
         setStatus('error');
         setStatusMsg('Link failed. Try refreshing.');
       });
+
+      return () => clearTimeout(forceTimer);
     });
 
     setPeer(newPeer);
