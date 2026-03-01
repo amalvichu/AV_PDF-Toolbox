@@ -17,18 +17,27 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
 
   useEffect(() => {
     // Initialize Peer (Client)
-    const newPeer = new Peer();
+    const newPeer = new Peer(undefined, { debug: 1 });
     setPeer(newPeer);
 
-    newPeer.on('open', () => {
+    newPeer.on('open', (id) => {
+      console.log('Mobile Peer ID:', id);
       // Connect to the Host (Laptop)
-      const connection = newPeer.connect(hostId);
+      const connection = newPeer.connect(hostId, {
+        reliable: true
+      });
       
-      connection.on('open', () => {
+      const handleOpen = () => {
         setConn(connection);
         setStatus('connected');
         setStatusMsg('Connected! Ready to scan.');
-      });
+      };
+
+      if (connection.open) {
+        handleOpen();
+      } else {
+        connection.on('open', handleOpen);
+      }
 
       connection.on('close', () => {
         setStatus('disconnected');
