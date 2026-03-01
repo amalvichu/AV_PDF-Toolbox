@@ -9,18 +9,17 @@ interface MobileSenderProps {
 export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
   const [peer, setPeer] = useState<Peer | null>(null);
   const [conn, setConn] = useState<any>(null);
-  const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'sending' | 'error' | 'success'>('idle');
-  const [statusMsg, setStatusMsg] = useState('Ready to scan');
+  const [status, setStatus] = useState<'idle' | 'sending' | 'error' | 'success'>('idle');
+  const [isServiceOnline, setIsServiceOnline] = useState(false);
+  const [statusMsg, setStatusMsg] = useState('Ready');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize Peer
   useEffect(() => {
+    // Standard PeerJS cloud server (most reliable for mobile discovery)
     const newPeer = new Peer({
-      host: '0.peerjs.com',
-      port: 443,
-      secure: true,
       debug: 1,
       config: {
         iceServers: [
@@ -29,71 +28,56 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
         ]
       }
     });
+
+    newPeer.on('open', () => setIsServiceOnline(true));
+    newPeer.on('disconnected', () => setIsServiceOnline(false));
+    newPeer.on('error', () => setIsServiceOnline(false));
+
     setPeer(newPeer);
     return () => newPeer.destroy();
   }, []);
 
-  const compressImage = async (file: File): Promise<Blob> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.src = URL.createObjectURL(file);
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 1200;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > MAX_WIDTH) {
-          height *= MAX_WIDTH / width;
-          width = MAX_WIDTH;
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-        
-        canvas.toBlob((blob) => {
-          resolve(blob || file);
-        }, 'image/jpeg', 0.7); // Compress to 70% quality
-      };
-    });
-  };
-
   const sendFile = async (file: File) => {
-    if (!peer) return;
+    if (!peer || !isServiceOnline) {
+        setStatus('error');
+        setStatusMsg('Service offline. Refresh page.');
+        return;
+    }
 
     setStatus('sending');
-    setStatusMsg('Compressing & Sending...');
+    setStatusMsg('Linking & Sending...');
 
     try {
       const compressedBlob = await compressImage(file);
       
-      let activeConn = conn;
-      if (!activeConn || !activeConn.open) {
-        activeConn = peer.connect(hostId, { reliable: false }); // Fast mode
-        await new Promise((resolve, reject) => {
-          const t = setTimeout(() => reject('Timeout'), 10000);
-          activeConn.on('open', () => { clearTimeout(t); resolve(true); });
-          activeConn.on('error', reject);
+      // Force fresh reliable connection for SIM networks
+      const activeConn = peer.connect(hostId, { reliable: true });
+      
+      await new Promise((resolve, reject) => {
+        const t = setTimeout(() => reject('Network timeout'), 15000);
+        activeConn.on('open', () => {
+          clearTimeout(t);
+          activeConn.send({
+            file: compressedBlob,
+            filename: file.name,
+            type: 'image/jpeg'
+          });
+          resolve(true);
         });
-        setConn(activeConn);
-      }
-
-      activeConn.send({
-        file: compressedBlob,
-        filename: file.name,
-        type: 'image/jpeg'
+        activeConn.on('error', (err) => {
+            clearTimeout(t);
+            reject(err);
+        });
       });
       
       setStatus('success');
-      setStatusMsg('Sent!');
+      setStatusMsg('Sent to laptop!');
       setTimeout(() => setStatus('idle'), 2000);
     } catch (err) {
       console.error('Send Error:', err);
       setStatus('error');
-      setStatusMsg('Link failed. Try again.');
-      setTimeout(() => setStatus('idle'), 3000);
+      setStatusMsg('Link failed. Is laptop tool open?');
+      setTimeout(() => setStatus('idle'), 4000);
     }
   };
 

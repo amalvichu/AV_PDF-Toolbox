@@ -43,11 +43,9 @@ export const ScanTool: React.FC = () => {
 
   // Initialize Peer on Mount
   useEffect(() => {
-    const id = Math.random().toString(36).substr(2, 6).toUpperCase();
+    // Longer, more unique ID to avoid collisions on the public server
+    const id = 'AVPDF-' + Math.random().toString(36).substr(2, 9).toUpperCase();
     const newPeer = new Peer(id, {
-      host: '0.peerjs.com',
-      port: 443,
-      secure: true,
       debug: 1,
       config: {
         iceServers: [
@@ -63,7 +61,7 @@ export const ScanTool: React.FC = () => {
     });
 
     newPeer.on('connection', (conn) => {
-      // Immediate feedback: Phone is attempting to connect
+      // Laptop sees the phone!
       setConnectionStatus('connected');
       setShowQR(false); 
 
@@ -86,7 +84,6 @@ export const ScanTool: React.FC = () => {
     if (!peerId) return '';
     const baseUrl = window.location.origin + window.location.pathname;
     const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-    // Explicitly encode the hostId to ensure no weird character issues
     return `${cleanBaseUrl}?mode=mobile-sender&hostId=${encodeURIComponent(peerId)}`;
   };
 
