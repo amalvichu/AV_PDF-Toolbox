@@ -53,15 +53,23 @@ const App: React.FC = () => {
   const handleBack = () => setSelectedTool(null);
 
   useEffect(() => {
-    // Check for mobile sender mode
-    const params = new URLSearchParams(window.location.search);
-    const mode = params.get('mode');
-    const id = params.get('hostId');
+    const checkMobileMode = () => {
+      const params = new URLSearchParams(window.location.search);
+      const mode = params.get('mode');
+      const id = params.get('hostId');
 
-    if (mode === 'mobile-sender' && id) {
-      setIsMobileMode(true);
-      setHostId(id);
-    }
+      if (mode === 'mobile-sender' && id) {
+        setIsMobileMode(true);
+        setHostId(id);
+      } else {
+        setIsMobileMode(false);
+        setHostId('');
+      }
+    };
+
+    checkMobileMode();
+    window.addEventListener('popstate', checkMobileMode);
+    return () => window.removeEventListener('popstate', checkMobileMode);
   }, []);
 
   if (isMobileMode) {

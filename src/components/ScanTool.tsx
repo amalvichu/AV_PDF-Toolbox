@@ -43,61 +43,58 @@ export const ScanTool: React.FC = () => {
 
   // Initialize Peer on Mount
   useEffect(() => {
-    // Let PeerJS assign a random ID for better stability
-    const newPeer = new Peer({
-      debug: 2,
-      config: {
-        'iceServers': [
-          { url: 'stun:stun.l.google.com:19302' },
-          { url: 'stun:stun1.l.google.com:19302' }
-        ]
-      }
-    });
-    
-    newPeer.on('open', (id) => {
-      console.log('Laptop Peer ID:', id);
-      setPeerId(id);
-      setConnectionStatus('waiting');
-    });
-
-    newPeer.on('connection', (conn) => {
-      console.log('Incoming connection from phone...');
-      
-      conn.on('open', () => {
-        console.log('Data channel opened with phone!');
-        setConnectionStatus('connected');
-        setShowQR(false);
-      });
-
-      conn.on('data', (data: any) => {
-        if (data.file) {
-          const blob = new Blob([data.file], { type: data.type });
-          const preview = URL.createObjectURL(blob);
-          setScannedPages(prev => [...prev, { blob, preview }]);
+    const initPeer = () => {
+      // Multiple STUN servers for better NAT traversal
+      const newPeer = new Peer({
+        debug: 1,
+        config: {
+          'iceServers': [
+            { url: 'stun:stun.l.google.com:19302' },
+            { url: 'stun:stun1.l.google.com:19302' },
+            { url: 'stun:stun2.l.google.com:19302' },
+            { url: 'stun:stun3.l.google.com:19302' },
+            { url: 'stun:stun4.l.google.com:19302' }
+          ]
         }
       });
-
-      conn.on('close', () => {
-        console.log('Phone disconnected');
+      
+      newPeer.on('open', (id) => {
+        setPeerId(id);
         setConnectionStatus('waiting');
       });
 
-      conn.on('error', (err) => {
-        console.error('Connection error:', err);
-      });
-    });
+      newPeer.on('connection', (conn) => {
+        conn.on('open', () => {
+          setConnectionStatus('connected');
+          setShowQR(false);
+        });
 
-    setPeer(newPeer);
+        conn.on('data', (data: any) => {
+          if (data.file) {
+            const blob = new Blob([data.file], { type: data.type });
+            const preview = URL.createObjectURL(blob);
+            setScannedPages(prev => [...prev, { blob, preview }]);
+          }
+        });
+
+        conn.on('close', () => setConnectionStatus('waiting'));
+      });
+
+      setPeer(newPeer);
+    };
+
+    initPeer();
 
     return () => {
-      newPeer.destroy();
+      if (peer) peer.destroy();
     };
-  }, []);
+  }, [showQR]); // Re-init on modal toggle to ensure fresh state if needed
 
   const getMobileUrl = () => {
-    if (!appBaseUrl) return '';
-    const baseUrl = appBaseUrl.endsWith('/') ? appBaseUrl : `${appBaseUrl}/`;
-    return `${baseUrl}?mode=mobile-sender&hostId=${peerId}`;
+    if (!peerId) return '';
+    const baseUrl = window.location.origin + window.location.pathname;
+    const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+    return `${cleanBaseUrl}?mode=mobile-sender&hostId=${peerId}`;
   };
 
   const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
