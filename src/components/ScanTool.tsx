@@ -54,12 +54,13 @@ export const ScanTool: React.FC = () => {
     });
 
     newPeer.on('connection', (conn) => {
-      setConnectionLog('Incoming link...');
+      // INSTANT FEEDBACK
+      setConnectionStatus('connected');
+      setShowQR(false); 
+      setConnectionLog('Phone Connected!');
       
       conn.on('open', () => {
-        setConnectionStatus('connected');
-        setShowQR(false); 
-        setConnectionLog('Link Open. Receiving...');
+        setConnectionLog('Data Pipe Ready.');
 
         conn.on('data', (data: any) => {
           if (data.file) {
@@ -67,14 +68,14 @@ export const ScanTool: React.FC = () => {
             const blob = new Blob([data.file], { type: data.type });
             const preview = URL.createObjectURL(blob);
             setScannedPages(prev => [...prev, { blob, preview }]);
-            // Keep connection alive for a bit
-            setTimeout(() => setConnectionLog('Ready for next...'), 2000);
+            setTimeout(() => setConnectionLog('Phone Connected!'), 2000);
           }
         });
       });
 
       conn.on('close', () => {
-        setConnectionLog('Phone link closed.');
+        // Only log, don't revert status immediately because burst pipes open/close often
+        setConnectionLog('Link idle.');
       });
     });
 
