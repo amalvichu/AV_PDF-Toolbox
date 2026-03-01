@@ -43,9 +43,18 @@ export const ScanTool: React.FC = () => {
 
   // Initialize Peer on Mount
   useEffect(() => {
-    const id = uuidv4().split('-')[0]; // Short, clean ID
+    const id = uuidv4().split('-')[0];
     const newPeer = new Peer(id, {
-      debug: 1
+      host: '0.peerjs.com',
+      port: 443,
+      secure: true,
+      debug: 1,
+      config: {
+        'iceServers': [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
+        ]
+      }
     });
     
     newPeer.on('open', (id) => {
@@ -81,7 +90,8 @@ export const ScanTool: React.FC = () => {
     if (!peerId) return '';
     const baseUrl = window.location.origin + window.location.pathname;
     const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-    return `${cleanBaseUrl}?mode=mobile-sender&hostId=${peerId}`;
+    // Ensure the ID is properly encoded for the URL
+    return `${cleanBaseUrl}?mode=mobile-sender&hostId=${encodeURIComponent(peerId)}`;
   };
 
   const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {

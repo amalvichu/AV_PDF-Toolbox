@@ -17,7 +17,18 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
 
   // Initialize Peer
   useEffect(() => {
-    const newPeer = new Peer();
+    const newPeer = new Peer({
+      host: '0.peerjs.com',
+      port: 443,
+      secure: true,
+      debug: 1,
+      config: {
+        'iceServers': [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
+        ]
+      }
+    });
     setPeer(newPeer);
     
     newPeer.on('open', () => {
@@ -42,13 +53,17 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
       if (!activeConn || !activeConn.open) {
         activeConn = peer.connect(hostId, { reliable: true });
         await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => reject('Connection timed out'), 8000);
+          // Increased timeout for mobile networks (12 seconds)
+          const timeout = setTimeout(() => reject('Connection timed out'), 12000);
           activeConn.on('open', () => {
             clearTimeout(timeout);
             setConn(activeConn);
             resolve(true);
           });
-          activeConn.on('error', reject);
+          activeConn.on('error', (err: any) => {
+             clearTimeout(timeout);
+             reject(err);
+          });
         });
       }
 
