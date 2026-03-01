@@ -44,8 +44,20 @@ export const ScanTool: React.FC = () => {
 
   // Initialize Peer on Mount
   useEffect(() => {
-    // Standard random ID - works best with PeerJS cloud
-    const newPeer = new Peer();
+    // Restore the ID and config that worked for you
+    const id = 'AVPDF-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+    const newPeer = new Peer(id, {
+      host: '0.peerjs.com',
+      port: 443,
+      secure: true,
+      debug: 1,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
+        ]
+      }
+    });
     
     newPeer.on('open', (id) => {
       setPeerId(id);
@@ -54,28 +66,23 @@ export const ScanTool: React.FC = () => {
     });
 
     newPeer.on('connection', (conn) => {
-      // INSTANT FEEDBACK
       setConnectionStatus('connected');
       setShowQR(false); 
       setConnectionLog('Phone Connected!');
-      
-      conn.on('open', () => {
-        setConnectionLog('Data Pipe Ready.');
 
-        conn.on('data', (data: any) => {
-          if (data.file) {
-            setConnectionLog('File received!');
-            const blob = new Blob([data.file], { type: data.type });
-            const preview = URL.createObjectURL(blob);
-            setScannedPages(prev => [...prev, { blob, preview }]);
-            setTimeout(() => setConnectionLog('Phone Connected!'), 2000);
-          }
-        });
+      conn.on('data', (data: any) => {
+        if (data.file) {
+          setConnectionLog('File received!');
+          // Convert array buffer back to blob
+          const blob = new Blob([data.file], { type: data.type });
+          const preview = URL.createObjectURL(blob);
+          setScannedPages(prev => [...prev, { blob, preview }]);
+          setTimeout(() => setConnectionLog('Phone Connected!'), 2000);
+        }
       });
 
       conn.on('close', () => {
-        // Only log, don't revert status immediately because burst pipes open/close often
-        setConnectionLog('Link idle.');
+        setConnectionLog('Phone disconnected.');
       });
     });
 
@@ -87,7 +94,7 @@ export const ScanTool: React.FC = () => {
     if (!peerId) return '';
     const baseUrl = window.location.origin + window.location.pathname;
     const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-    return `${cleanBaseUrl}?mode=mobile-sender&hostId=${peerId}`;
+    return `${cleanBaseUrl}?mode=mobile-sender&hostId=${encodeURIComponent(peerId)}`;
   };
 
   const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {

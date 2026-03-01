@@ -43,37 +43,36 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
     });
   };
 
-  // Initialize Peer
+  // Initialize Peer and Handshake
   useEffect(() => {
-    const newPeer = new Peer();
-    
+    // Restore the config that worked for you
+    const newPeer = new Peer({
+      host: '0.peerjs.com',
+      port: 443,
+      secure: true,
+      debug: 1,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
+        ]
+      }
+    });
+
     newPeer.on('open', () => {
-      // Use unreliable mode (UDP) - much better for bypassing SIM network blocks
-      const activeConn = newPeer.connect(hostId, { reliable: false });
-      
-      const handleOpen = () => {
+      // Connect to the laptop
+      const activeConn = newPeer.connect(hostId, { reliable: true });
+
+      activeConn.on('open', () => {
         setConn(activeConn);
         setStatus('connected');
         setStatusMsg('Ready to scan');
-      };
-
-      activeConn.on('open', handleOpen);
-
-      // FORCE UI: If handshake takes > 4 seconds, show buttons anyway
-      // This solves the 'Stuck on Linking' problem
-      const forceTimer = setTimeout(() => {
-        if (status === 'linking') {
-          handleOpen();
-          console.log('Forcing connection UI...');
-        }
-      }, 4000);
+      });
 
       activeConn.on('error', () => {
         setStatus('error');
         setStatusMsg('Link failed. Try refreshing.');
       });
-
-      return () => clearTimeout(forceTimer);
     });
 
     setPeer(newPeer);
@@ -81,56 +80,37 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
   }, [hostId]);
 
   const sendFile = async (file: File) => {
-    if (!peer) return;
+    if (!conn || status !== 'connected') return;
 
     setStatus('sending');
-    setStatusMsg('Preparing file...');
+    setStatusMsg('Compressing & Sending...');
 
     try {
       const compressedBlob = await compressImage(file);
+
+      // Keep the raw buffer fix which solves the loading issue
       const arrayBuffer = await compressedBlob.arrayBuffer();
 
-      setStatusMsg('Opening fresh link...');
-
-      // Open a BRAND NEW connection for this specific file
-      // This bypasses stale/dead connections entirely
-      const burstConn = peer.connect(hostId, { reliable: true });
-
-      await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject('Network timeout'), 15000);
-
-        burstConn.on('open', () => {
-          clearTimeout(timeout);
-          setStatusMsg('Pushing data...');
-
-          burstConn.send({
-            file: arrayBuffer,
-            filename: file.name,
-            type: 'image/jpeg'
-          });
-
-          // Give it a moment to leave the buffer then resolve
-          setTimeout(resolve, 1000);
-        });
-
-        burstConn.on('error', (err) => {
-          clearTimeout(timeout);
-          reject(err);
-        });
+      conn.send({
+        file: arrayBuffer,
+        filename: file.name,
+        type: 'image/jpeg'
       });
 
       setStatus('success');
-      setStatusMsg('Sent to laptop!');
-      setTimeout(() => setStatus('connected'), 2000);
+      setStatusMsg('Sent successfully!');
+      setTimeout(() => {
+        setStatus('connected');
+        setStatusMsg('Ready to scan');
+      }, 2000);
 
     } catch (err) {
       console.error('Send error:', err);
       setStatus('error');
-      setStatusMsg('Link failed. Is laptop tool open?');
-      setTimeout(() => setStatus('connected'), 4000);
+      setStatusMsg('Failed to send.');
+      setTimeout(() => setStatus('connected'), 3000);
     }
   };
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       sendFile(e.target.files[0]);
