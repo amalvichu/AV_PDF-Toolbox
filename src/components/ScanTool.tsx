@@ -12,6 +12,7 @@ export const ScanTool: React.FC = () => {
   const [peerId, setPeerId] = useState('');
   const [peer, setPeer] = useState<Peer | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'waiting' | 'connected'>('disconnected');
+  const [connectionLog, setConnectionLog] = useState<string>('Initializing server...');
   
   // State for the base URL (defaults to current origin + path)
   const [appBaseUrl, setAppBaseUrl] = useState(() => {
@@ -40,8 +41,6 @@ export const ScanTool: React.FC = () => {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { imagesToPDF, downloadBlob } = usePDF();
-
-  const [connectionLog, setConnectionLog] = useState<string>('Initializing server...');
 
   // Initialize Peer on Mount
   useEffect(() => {
@@ -102,11 +101,12 @@ export const ScanTool: React.FC = () => {
     return () => newPeer.destroy();
   }, []); 
 
-  // ... (inside the QR Modal UI part) ...
-              <div className="bg-slate-800/50 p-3 rounded-xl mb-6 text-left border border-slate-700">
-                <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Status Log</p>
-                <p className="text-xs text-blue-400 font-mono">{connectionLog}</p>
-              </div>
+  const getMobileUrl = () => {
+    if (!peerId) return '';
+    const baseUrl = window.location.origin + window.location.pathname;
+    const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+    return `${cleanBaseUrl}?mode=mobile-sender&hostId=${encodeURIComponent(peerId)}`;
+  };
 
   const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -250,6 +250,11 @@ export const ScanTool: React.FC = () => {
               <p className="text-slate-400 text-sm mb-6">
                 Open your phone's camera app and scan this code to connect instantly.
               </p>
+
+              <div className="bg-slate-800/50 p-3 rounded-xl mb-6 text-left border border-slate-700">
+                <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Status Log</p>
+                <p className="text-xs text-blue-400 font-mono">{connectionLog}</p>
+              </div>
 
               <div className="bg-slate-800/50 p-4 rounded-xl text-left">
                 <label className="block text-blue-400 text-[10px] font-bold uppercase tracking-widest mb-2 flex items-center">
