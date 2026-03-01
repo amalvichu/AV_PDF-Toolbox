@@ -54,22 +54,27 @@ export const ScanTool: React.FC = () => {
     });
 
     newPeer.on('connection', (conn) => {
-      // Instant connection feedback
-      setConnectionStatus('connected');
-      setShowQR(false); 
-      setConnectionLog('Phone Connected!');
+      setConnectionLog('Incoming link...');
+      
+      conn.on('open', () => {
+        setConnectionStatus('connected');
+        setShowQR(false); 
+        setConnectionLog('Link Open. Receiving...');
 
-      conn.on('data', (data: any) => {
-        if (data.file) {
-          const blob = new Blob([data.file], { type: data.type });
-          const preview = URL.createObjectURL(blob);
-          setScannedPages(prev => [...prev, { blob, preview }]);
-        }
+        conn.on('data', (data: any) => {
+          if (data.file) {
+            setConnectionLog('File received!');
+            const blob = new Blob([data.file], { type: data.type });
+            const preview = URL.createObjectURL(blob);
+            setScannedPages(prev => [...prev, { blob, preview }]);
+            // Keep connection alive for a bit
+            setTimeout(() => setConnectionLog('Ready for next...'), 2000);
+          }
+        });
       });
 
       conn.on('close', () => {
-        setConnectionStatus('waiting');
-        setConnectionLog('Disconnected.');
+        setConnectionLog('Phone link closed.');
       });
     });
 

@@ -81,52 +81,55 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
   }, [hostId]);
 
   const sendFile = async (file: File) => {
-    // If not connected yet, try to connect again
-    if (!conn || !conn.open) {
-        setStatus('sending');
-        setStatusMsg('Linking...');
-        const newConn = peer?.connect(hostId, { reliable: true });
-        newConn?.on('open', () => {
-            setConn(newConn);
-            processAndSend(file, newConn);
+    if (!peer) return;
+
+    setStatus('sending');
+    setStatusMsg('Preparing file...');
+
+    try {
+      const compressedBlob = await compressImage(file);
+      const arrayBuffer = await compressedBlob.arrayBuffer();
+
+      setStatusMsg('Opening fresh link...');
+
+      // Open a BRAND NEW connection for this specific file
+      // This bypasses stale/dead connections entirely
+      const burstConn = peer.connect(hostId, { reliable: true });
+
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject('Network timeout'), 15000);
+
+        burstConn.on('open', () => {
+          clearTimeout(timeout);
+          setStatusMsg('Pushing data...');
+
+          burstConn.send({
+            file: arrayBuffer,
+            filename: file.name,
+            type: 'image/jpeg'
+          });
+
+          // Give it a moment to leave the buffer then resolve
+          setTimeout(resolve, 1000);
         });
-        return;
-    }
-    processAndSend(file, conn);
-  };
-const processAndSend = async (file: File, activeConn: any) => {
-  setStatus('sending');
-  setStatusMsg('Compressing & Sending...');
 
-  try {
-    const compressedBlob = await compressImage(file);
+        burstConn.on('error', (err) => {
+          clearTimeout(timeout);
+          reject(err);
+        });
+      });
 
-    // Convert Blob to ArrayBuffer for faster P2P transfer on mobile
-    const arrayBuffer = await compressedBlob.arrayBuffer();
-
-    activeConn.send({
-      file: arrayBuffer,
-      filename: file.name,
-      type: 'image/jpeg'
-    });
-
-    // Small delay to ensure buffer starts clearing
-    setTimeout(() => {
       setStatus('success');
-      setStatusMsg('Sent successfully!');
-      setTimeout(() => {
-        setStatus('connected');
-        setStatusMsg('Ready to scan');
-      }, 2000);
-    }, 500);
+      setStatusMsg('Sent to laptop!');
+      setTimeout(() => setStatus('connected'), 2000);
 
-  } catch (err) {
-    console.error('Send error:', err);
-    setStatus('error');
-    setStatusMsg('Failed to send.');
-    setTimeout(() => setStatus('connected'), 3000);
-  }
-};
+    } catch (err) {
+      console.error('Send error:', err);
+      setStatus('error');
+      setStatusMsg('Link failed. Is laptop tool open?');
+      setTimeout(() => setStatus('connected'), 4000);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
