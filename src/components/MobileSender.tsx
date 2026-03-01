@@ -43,52 +43,23 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
     });
   };
 
-  // Initialize Peer and Handshake
+  // Initialize Peer
   useEffect(() => {
-    const newPeer = new Peer({
-      host: '0.peerjs.com',
-      port: 443,
-      secure: true,
-      debug: 1,
-      config: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
-        ]
-      }
-    });
-
+    const newPeer = new Peer();
+    
     newPeer.on('open', () => {
+      // Auto-connect to the laptop
       const activeConn = newPeer.connect(hostId, { reliable: true });
       
       activeConn.on('open', () => {
-        // Step 1: Start an aggressive ping loop
-        const pingInterval = setInterval(() => {
-            if (status !== 'connected') {
-                activeConn.send({ type: 'verification-ping' });
-            } else {
-                clearInterval(pingInterval);
-            }
-        }, 1000);
-        
-        // Step 2: Wait for laptop to say 'verification-pong'
-        activeConn.on('data', (data: any) => {
-          if (data.type === 'verification-pong') {
-            clearInterval(pingInterval);
-            setConn(activeConn);
-            setStatus('connected');
-            setStatusMsg('Ready to scan');
-          }
-        });
-
-        // Cleanup on unmount or close
-        return () => clearInterval(pingInterval);
+        setConn(activeConn);
+        setStatus('connected');
+        setStatusMsg('Ready to scan');
       });
 
-      activeConn.on('error', (err) => {
-        console.error('Mobile Connection Error:', err);
+      activeConn.on('error', () => {
         setStatus('error');
-        setStatusMsg('Link failed. Rescan QR.');
+        setStatusMsg('Link failed. Try refreshing.');
       });
     });
 
@@ -97,14 +68,27 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
   }, [hostId]);
 
   const sendFile = async (file: File) => {
-    if (!conn || status !== 'connected') return;
+    // If not connected yet, try to connect again
+    if (!conn || !conn.open) {
+        setStatus('sending');
+        setStatusMsg('Linking...');
+        const newConn = peer?.connect(hostId, { reliable: true });
+        newConn?.on('open', () => {
+            setConn(newConn);
+            processAndSend(file, newConn);
+        });
+        return;
+    }
+    processAndSend(file, conn);
+  };
 
+  const processAndSend = async (file: File, activeConn: any) => {
     setStatus('sending');
-    setStatusMsg('Sending photo...');
+    setStatusMsg('Compressing & Sending...');
 
     try {
       const compressedBlob = await compressImage(file);
-      conn.send({
+      activeConn.send({
         file: compressedBlob,
         filename: file.name,
         type: 'image/jpeg'
@@ -117,7 +101,6 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
         setStatusMsg('Ready to scan');
       }, 2000);
     } catch (err) {
-      console.error('Send error:', err);
       setStatus('error');
       setStatusMsg('Failed to send.');
       setTimeout(() => setStatus('connected'), 3000);
