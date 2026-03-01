@@ -44,16 +44,16 @@ export const ScanTool: React.FC = () => {
   // Initialize Peer on Mount
   useEffect(() => {
     const initPeer = () => {
-      // Multiple STUN servers for better NAT traversal
+      // Explicit configuration to ensure both devices use the same signaling server
       const newPeer = new Peer({
-        debug: 1,
+        host: '0.peerjs.com',
+        port: 443,
+        secure: true,
+        debug: 3,
         config: {
           'iceServers': [
-            { url: 'stun:stun.l.google.com:19302' },
-            { url: 'stun:stun1.l.google.com:19302' },
-            { url: 'stun:stun2.l.google.com:19302' },
-            { url: 'stun:stun3.l.google.com:19302' },
-            { url: 'stun:stun4.l.google.com:19302' }
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
           ]
         }
       });
@@ -78,23 +78,29 @@ export const ScanTool: React.FC = () => {
         });
 
         conn.on('close', () => setConnectionStatus('waiting'));
+        conn.on('error', (err) => console.error('Peer connection error:', err));
       });
+
+      newPeer.on('error', (err) => console.error('PeerJS error:', err));
 
       setPeer(newPeer);
     };
 
-    initPeer();
+    if (showQR || connectionStatus === 'disconnected') {
+      initPeer();
+    }
 
     return () => {
       if (peer) peer.destroy();
     };
-  }, [showQR]); // Re-init on modal toggle to ensure fresh state if needed
+  }, [showQR]); 
 
   const getMobileUrl = () => {
     if (!peerId) return '';
     const baseUrl = window.location.origin + window.location.pathname;
     const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-    return `${cleanBaseUrl}?mode=mobile-sender&hostId=${peerId}`;
+    // Ensure the ID is properly encoded
+    return `${cleanBaseUrl}?mode=mobile-sender&hostId=${encodeURIComponent(peerId)}`;
   };
 
   const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
