@@ -43,11 +43,17 @@ export const ScanTool: React.FC = () => {
 
   // Initialize Peer on Mount
   useEffect(() => {
-    const id = Math.random().toString(36).substr(2, 6).toUpperCase(); // Short 6-char ID
+    const id = Math.random().toString(36).substr(2, 6).toUpperCase();
     const newPeer = new Peer(id, {
+      host: '0.peerjs.com',
+      port: 443,
+      secure: true,
       debug: 1,
       config: {
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
+        ]
       }
     });
     
@@ -57,18 +63,15 @@ export const ScanTool: React.FC = () => {
     });
 
     newPeer.on('connection', (conn) => {
-      conn.on('open', () => {
-        setConnectionStatus('connected');
-        setShowQR(false); 
-      });
+      // Immediate feedback: Phone is attempting to connect
+      setConnectionStatus('connected');
+      setShowQR(false); 
 
       conn.on('data', (data: any) => {
         if (data.file) {
           const blob = new Blob([data.file], { type: data.type });
           const preview = URL.createObjectURL(blob);
           setScannedPages(prev => [...prev, { blob, preview }]);
-          // Auto-reconnect safety
-          setConnectionStatus('connected');
         }
       });
 
@@ -83,7 +86,8 @@ export const ScanTool: React.FC = () => {
     if (!peerId) return '';
     const baseUrl = window.location.origin + window.location.pathname;
     const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-    return `${cleanBaseUrl}?mode=mobile-sender&hostId=${peerId}`;
+    // Explicitly encode the hostId to ensure no weird character issues
+    return `${cleanBaseUrl}?mode=mobile-sender&hostId=${encodeURIComponent(peerId)}`;
   };
 
   const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -17,7 +17,18 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
 
   // Initialize Peer
   useEffect(() => {
-    const newPeer = new Peer();
+    const newPeer = new Peer({
+      host: '0.peerjs.com',
+      port: 443,
+      secure: true,
+      debug: 1,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
+        ]
+      }
+    });
     setPeer(newPeer);
     return () => newPeer.destroy();
   }, []);
