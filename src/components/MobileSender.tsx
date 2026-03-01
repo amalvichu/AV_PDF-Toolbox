@@ -9,114 +9,71 @@ interface MobileSenderProps {
 export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
   const [peer, setPeer] = useState<Peer | null>(null);
   const [conn, setConn] = useState<any>(null);
-  const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'sending' | 'error'>('connecting');
-  const [statusMsg, setStatusMsg] = useState('Connecting to Laptop...');
-  const [retryCount, setRetryCount] = useState(0);
+  const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'sending' | 'error' | 'success'>('idle');
+  const [statusMsg, setStatusMsg] = useState('Ready to scan');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  const connectToHost = (peerInstance: Peer) => {
-    setStatus('connecting');
-    setStatusMsg('Linking to Laptop...');
-    
-    const connection = peerInstance.connect(hostId, {
-      reliable: true,
-      metadata: { device: 'mobile' }
-    });
-
-    const timeout = setTimeout(() => {
-      if (status !== 'connected') {
-        setStatusMsg('Still trying to link... Check your laptop screen.');
-      }
-    }, 5000);
-
-    const handleOpen = () => {
-      clearTimeout(timeout);
-      setConn(connection);
-      setStatus('connected');
-      setStatusMsg('Connected! Ready to scan.');
-    };
-
-    if (connection.open) {
-      handleOpen();
-    } else {
-      connection.on('open', handleOpen);
-    }
-
-    connection.on('close', () => {
-      setStatus('disconnected');
-      setStatusMsg('Connection lost. Please rescan QR.');
-    });
-
-    connection.on('error', (err) => {
-      console.error('Connection Error:', err);
-      setStatus('error');
-      setStatusMsg('Link failed. Is the laptop tool still open?');
-    });
-  };
-
+  // Initialize Peer
   useEffect(() => {
-    const newPeer = new Peer({ 
-      host: '0.peerjs.com',
-      port: 443,
-      secure: true,
-      debug: 1,
-      config: {
-        'iceServers': [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun3.l.google.com:19302' },
-          { urls: 'stun:stun4.l.google.com:19302' },
-          { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
-        ]
-      }
-    });
+    const newPeer = new Peer();
     setPeer(newPeer);
-
-    newPeer.on('open', (id) => {
-      console.log('Mobile Peer ID:', id);
-      connectToHost(newPeer);
+    
+    newPeer.on('open', () => {
+      setStatus('idle');
+      // Pre-connect for speed, but don't block UI
+      const connection = newPeer.connect(hostId, { reliable: true });
+      connection.on('open', () => setConn(connection));
     });
 
-    newPeer.on('error', (err) => {
-      console.error('Peer Error:', err);
-      setStatus('error');
-      setStatusMsg('Service error. Try refreshing.');
-    });
+    return () => newPeer.destroy();
+  }, [hostId]);
 
-    return () => {
-      newPeer.destroy();
-    };
-  }, [hostId, retryCount]);
-
-  const handleRetry = () => {
-    setRetryCount(prev => prev + 1);
-  };
-
-  const sendFile = (file: File) => {
-    if (!conn || status !== 'connected') return;
+  const sendFile = async (file: File) => {
+    if (!peer) return;
 
     setStatus('sending');
     setStatusMsg(`Sending ${file.name}...`);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const blob = new Blob([new Uint8Array(e.target?.result as ArrayBuffer)], { type: file.type });
-      
-      conn.send({
-        file: blob,
-        filename: file.name,
-        type: file.type
-      });
+    try {
+      // Get or Create Connection
+      let activeConn = conn;
+      if (!activeConn || !activeConn.open) {
+        activeConn = peer.connect(hostId, { reliable: true });
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject('Connection timed out'), 8000);
+          activeConn.on('open', () => {
+            clearTimeout(timeout);
+            setConn(activeConn);
+            resolve(true);
+          });
+          activeConn.on('error', reject);
+        });
+      }
 
-      setTimeout(() => {
-        setStatus('connected');
-        setStatusMsg('Sent successfully! Take another?');
-      }, 800);
-    };
-    reader.readAsArrayBuffer(file);
+      // Send Data
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const blob = new Blob([new Uint8Array(e.target?.result as ArrayBuffer)], { type: file.type });
+        activeConn.send({
+          file: blob,
+          filename: file.name,
+          type: file.type
+        });
+        
+        setStatus('success');
+        setStatusMsg('Sent successfully!');
+        setTimeout(() => setStatus('idle'), 2000);
+      };
+      reader.readAsArrayBuffer(file);
+
+    } catch (err) {
+      console.error('Send Error:', err);
+      setStatus('error');
+      setStatusMsg('Failed to send. Is the laptop tool open?');
+      setTimeout(() => setStatus('idle'), 3000);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -129,55 +86,51 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
 
   return (
     <div className="min-h-screen bg-slate-950 p-6 flex flex-col items-center justify-center text-center">
-      <div className={`mb-8 p-4 rounded-full ${status === 'connected' ? 'bg-green-500/20' : 'bg-slate-800'}`}>
-        {status === 'connected' ? <Wifi className="w-12 h-12 text-green-500 animate-pulse" /> :
+      <div className={`mb-8 p-4 rounded-full ${status === 'success' ? 'bg-green-500/20' : status === 'sending' ? 'bg-blue-500/20' : 'bg-slate-800'}`}>
+        {status === 'success' ? <CheckCircle2 className="w-12 h-12 text-green-500 animate-in zoom-in" /> :
          status === 'sending' ? <Send className="w-12 h-12 text-blue-500 animate-bounce" /> :
-         status === 'error' ? <AlertCircle className="w-12 h-12 text-red-500" /> :
+         status === 'error' ? <AlertCircle className="w-12 h-12 text-red-500 animate-shake" /> :
          <Wifi className="w-12 h-12 text-slate-500" />}
       </div>
 
       <h1 className="text-2xl font-bold text-white mb-2">Remote Scanner</h1>
       <p className={`text-sm mb-12 font-medium ${
-        status === 'connected' ? 'text-green-400' :
+        status === 'success' ? 'text-green-400' :
         status === 'error' ? 'text-red-400' :
         'text-slate-400'
       }`}>
         {statusMsg}
       </p>
 
-      {(status === 'connecting' || status === 'error' || status === 'disconnected') && (
+      {/* Buttons are ALWAYS visible now */}
+      <div className="w-full max-w-sm space-y-6">
+        <input type="file" accept="image/*" capture="environment" className="hidden" ref={cameraInputRef} onChange={handleFileChange} />
+        <input type="file" accept="image/*" multiple className="hidden" ref={fileInputRef} onChange={handleFileChange} />
+
         <button 
-          onClick={handleRetry}
-          className="bg-slate-800 text-white px-6 py-3 rounded-xl text-sm font-bold border border-slate-700 hover:bg-slate-700 transition-colors"
+          onClick={() => cameraInputRef.current?.click()}
+          disabled={status === 'sending'}
+          className="w-full bg-blue-600 hover:bg-blue-500 active:scale-95 disabled:opacity-50 text-white font-black py-8 rounded-3xl flex flex-col items-center justify-center transition-all shadow-xl shadow-blue-500/20 ring-4 ring-blue-500/20"
         >
-          Retry Link
+          <Camera className="w-12 h-12 mb-2" />
+          <span className="text-xl">SNAP PHOTO</span>
         </button>
-      )}
 
-      {status === 'connected' && (
-        <div className="w-full max-w-sm space-y-6 animate-in slide-in-from-bottom-10 fade-in duration-500">
-          <input type="file" accept="image/*" capture="environment" className="hidden" ref={cameraInputRef} onChange={handleFileChange} />
-          <input type="file" accept="image/*" multiple className="hidden" ref={fileInputRef} onChange={handleFileChange} />
-
-          <button 
-            onClick={() => cameraInputRef.current?.click()}
-            className="w-full bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-black py-8 rounded-3xl flex flex-col items-center justify-center transition-all shadow-xl shadow-blue-500/20 ring-4 ring-blue-500/20"
-          >
-            <Camera className="w-12 h-12 mb-2" />
-            <span className="text-xl">SNAP PHOTO</span>
-          </button>
-
-          <button 
-            onClick={() => fileInputRef.current?.click()}
-            className="w-full bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold py-6 rounded-2xl flex items-center justify-center transition-all border border-slate-700"
-          >
-            <Upload className="w-6 h-6 mr-3 text-slate-400" />
-            <span className="text-lg">Select from Gallery</span>
-          </button>
-          
-          <p className="text-slate-500 text-xs">Photos are sent directly to your laptop.</p>
+        <button 
+          onClick={() => fileInputRef.current?.click()}
+          disabled={status === 'sending'}
+          className="w-full bg-slate-800 hover:bg-slate-700 active:scale-95 disabled:opacity-50 text-white font-bold py-6 rounded-2xl flex items-center justify-center transition-all border border-slate-700"
+        >
+          <Upload className="w-6 h-6 mr-3 text-slate-400" />
+          <span className="text-lg">Select from Gallery</span>
+        </button>
+        
+        <div className="pt-4">
+            <p className="text-slate-500 text-[10px] leading-relaxed uppercase tracking-widest font-bold">
+                Connection ID: {hostId}
+            </p>
         </div>
-      )}
+      </div>
 
       {status === 'sending' && (
         <div className="fixed inset-0 bg-black/80 flex flex-col items-center justify-center z-50 backdrop-blur-sm">

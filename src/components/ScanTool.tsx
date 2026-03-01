@@ -41,25 +41,11 @@ export const ScanTool: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { imagesToPDF, downloadBlob } = usePDF();
 
-  // Persistent Peer initialization
+  // Initialize Peer on Mount
   useEffect(() => {
-    if (peer) return; // Don't re-init if already exists
-
-    const newPeer = new Peer({
-      host: '0.peerjs.com',
-      port: 443,
-      secure: true,
-      debug: 1,
-      config: {
-        'iceServers': [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun3.l.google.com:19302' },
-          { urls: 'stun:stun4.l.google.com:19302' },
-          { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
-        ]
-      }
+    const id = uuidv4().split('-')[0]; // Short, clean ID
+    const newPeer = new Peer(id, {
+      debug: 1
     });
     
     newPeer.on('open', (id) => {
@@ -68,11 +54,9 @@ export const ScanTool: React.FC = () => {
     });
 
     newPeer.on('connection', (conn) => {
-      conn.on('open', () => {
-        setConnectionStatus('connected');
-        setShowQR(false);
-      });
-
+      setConnectionStatus('connected');
+      setShowQR(false); 
+      
       conn.on('data', (data: any) => {
         if (data.file) {
           const blob = new Blob([data.file], { type: data.type });
@@ -81,22 +65,23 @@ export const ScanTool: React.FC = () => {
         }
       });
 
-      conn.on('close', () => setConnectionStatus('waiting'));
+      conn.on('close', () => {
+        setConnectionStatus('waiting');
+      });
     });
 
     setPeer(newPeer);
 
     return () => {
-      // Keep it alive during the session, only destroy on unmount
+      newPeer.destroy();
     };
   }, []); 
 
   const getMobileUrl = () => {
     if (!peerId) return '';
-    // Use the absolute public URL to ensure mobile compatibility
     const baseUrl = window.location.origin + window.location.pathname;
     const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-    return `${cleanBaseUrl}?mode=mobile-sender&hostId=${encodeURIComponent(peerId)}`;
+    return `${cleanBaseUrl}?mode=mobile-sender&hostId=${peerId}`;
   };
 
   const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
