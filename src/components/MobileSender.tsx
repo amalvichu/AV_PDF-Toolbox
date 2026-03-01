@@ -11,56 +11,74 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
   const [conn, setConn] = useState<any>(null);
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'sending' | 'error'>('connecting');
   const [statusMsg, setStatusMsg] = useState('Connecting to Laptop...');
+  const [retryCount, setRetryCount] = useState(0);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  const connectToHost = (peerInstance: Peer) => {
+    setStatus('connecting');
+    setStatusMsg('Linking to Laptop...');
+    
+    const connection = peerInstance.connect(hostId, {
+      reliable: true,
+      metadata: { device: 'mobile' }
+    });
+
+    const timeout = setTimeout(() => {
+      if (status !== 'connected') {
+        setStatusMsg('Still trying to link... Check your laptop screen.');
+      }
+    }, 5000);
+
+    const handleOpen = () => {
+      clearTimeout(timeout);
+      setConn(connection);
+      setStatus('connected');
+      setStatusMsg('Connected! Ready to scan.');
+    };
+
+    if (connection.open) {
+      handleOpen();
+    } else {
+      connection.on('open', handleOpen);
+    }
+
+    connection.on('close', () => {
+      setStatus('disconnected');
+      setStatusMsg('Connection lost. Please rescan QR.');
+    });
+
+    connection.on('error', (err) => {
+      console.error('Connection Error:', err);
+      setStatus('error');
+      setStatusMsg('Link failed. Is the laptop tool still open?');
+    });
+  };
+
   useEffect(() => {
-    // Initialize Peer (Client)
     const newPeer = new Peer(undefined, { debug: 1 });
     setPeer(newPeer);
 
     newPeer.on('open', (id) => {
       console.log('Mobile Peer ID:', id);
-      // Connect to the Host (Laptop)
-      const connection = newPeer.connect(hostId, {
-        reliable: true
-      });
-      
-      const handleOpen = () => {
-        setConn(connection);
-        setStatus('connected');
-        setStatusMsg('Connected! Ready to scan.');
-      };
-
-      if (connection.open) {
-        handleOpen();
-      } else {
-        connection.on('open', handleOpen);
-      }
-
-      connection.on('close', () => {
-        setStatus('disconnected');
-        setStatusMsg('Connection lost. Please rescan QR.');
-      });
-
-      connection.on('error', (err) => {
-        console.error('Connection Error:', err);
-        setStatus('error');
-        setStatusMsg('Failed to connect to laptop.');
-      });
+      connectToHost(newPeer);
     });
 
     newPeer.on('error', (err) => {
       console.error('Peer Error:', err);
       setStatus('error');
-      setStatusMsg('Connection failed. Is the laptop tool open?');
+      setStatusMsg('Service error. Try refreshing.');
     });
 
     return () => {
       newPeer.destroy();
     };
-  }, [hostId]);
+  }, [hostId, retryCount]);
+
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1);
+  };
 
   const sendFile = (file: File) => {
     if (!conn || status !== 'connected') return;
@@ -111,6 +129,15 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
       }`}>
         {statusMsg}
       </p>
+
+      {(status === 'connecting' || status === 'error' || status === 'disconnected') && (
+        <button 
+          onClick={handleRetry}
+          className="bg-slate-800 text-white px-6 py-3 rounded-xl text-sm font-bold border border-slate-700 hover:bg-slate-700 transition-colors"
+        >
+          Retry Link
+        </button>
+      )}
 
       {status === 'connected' && (
         <div className="w-full max-w-sm space-y-6 animate-in slide-in-from-bottom-10 fade-in duration-500">
