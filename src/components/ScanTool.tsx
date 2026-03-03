@@ -95,9 +95,16 @@ export const ScanTool: React.FC = () => {
       conn.on('error', (err) => {
         setConnectionLog('Link error. Please retry.');
       });
+
+      // Timeout if connection doesn't open
+      setTimeout(() => {
+        if (conn.open === false) {
+          conn.close();
+          setConnectionLog('Handshake timed out.');
+        }
+      }, 10000);
     });
 
-    setPeer(newPeer);
     return () => newPeer.destroy();
   }, []); 
 
