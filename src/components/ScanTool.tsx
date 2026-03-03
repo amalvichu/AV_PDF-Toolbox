@@ -44,23 +44,12 @@ export const ScanTool: React.FC = () => {
 
   // Initialize Peer on Mount
   useEffect(() => {
-    // Restore the ID and config that worked for you
-    const id = 'AVPDF-' + Math.random().toString(36).substr(2, 6).toUpperCase();
-    const newPeer = new Peer(id, {
+    // Let PeerJS generate the ID for maximum reliability on their public server
+    const newPeer = new Peer({
       host: '0.peerjs.com',
       port: 443,
       secure: true,
-      debug: 1,
-      config: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun3.l.google.com:19302' },
-          { urls: 'stun:stun4.l.google.com:19302' },
-          { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
-        ]
-      }
+      debug: 1
     });
     
     newPeer.on('open', (id) => {
@@ -71,10 +60,7 @@ export const ScanTool: React.FC = () => {
 
     newPeer.on('error', (err) => {
       console.error('Peer error:', err);
-      setConnectionLog(`Connection error: ${err.type}`);
-      if (err.type === 'peer-unavailable') {
-        setConnectionStatus('disconnected');
-      }
+      setConnectionLog(`Server Error: ${err.type}`);
     });
 
     newPeer.on('connection', (conn) => {
@@ -96,12 +82,6 @@ export const ScanTool: React.FC = () => {
       conn.on('close', () => {
         setConnectionStatus('waiting');
         setConnectionLog('Phone disconnected. Waiting...');
-      });
-      
-      conn.on('error', (err) => {
-        console.error('Connection error:', err);
-        setConnectionLog('Connection lost. Reconnecting...');
-        setConnectionStatus('waiting');
       });
     });
 

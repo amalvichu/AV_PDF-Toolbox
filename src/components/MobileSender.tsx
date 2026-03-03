@@ -10,16 +10,10 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
   const [peer, setPeer] = useState<Peer | null>(null);
   const [conn, setConn] = useState<any>(null);
   const [status, setStatus] = useState<'idle' | 'linking' | 'connected' | 'sending' | 'error' | 'success'>('linking');
-  const [statusMsg, setStatusMsg] = useState('Initializing P2P...');
-  const [debugLog, setDebugLog] = useState<string[]>([]);
+  const [statusMsg, setStatusMsg] = useState('Linking to laptop...');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
-
-  const addLog = (msg: string) => {
-    setDebugLog(prev => [msg, ...prev].slice(0, 5));
-    setStatusMsg(msg);
-  };
 
   const compressImage = async (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
@@ -50,63 +44,47 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
 
   const initConnection = () => {
     if (peer) peer.destroy();
-    
-    addLog('Connecting to cloud server...');
     setStatus('linking');
+    setStatusMsg('Connecting...');
 
     const newPeer = new Peer({
       host: '0.peerjs.com',
       port: 443,
       secure: true,
-      debug: 2,
-      config: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun3.l.google.com:19302' },
-          { urls: 'stun:stun4.l.google.com:19302' },
-          { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
-        ]
-      }
+      debug: 1
     });
 
-    newPeer.on('open', (id) => {
-      addLog(`P2P ID: ${id.slice(0, 5)}...`);
-      addLog(`Searching for Laptop: ${hostId}`);
-      
-      const activeConn = newPeer.connect(hostId, {
-        reliable: true
-      });
+    newPeer.on('open', () => {
+      setStatusMsg('Searching for laptop...');
+      const activeConn = newPeer.connect(hostId, { reliable: true });
 
       activeConn.on('open', () => {
         setConn(activeConn);
         setStatus('connected');
-        addLog('Connected to Laptop!');
+        setStatusMsg('Ready to scan');
       });
 
       activeConn.on('error', (err) => {
-        console.error('Conn Error:', err);
+        console.error('Conn error:', err);
         setStatus('error');
-        addLog('Link failed. Is the laptop tool open?');
+        setStatusMsg('Failed to link.');
       });
 
       activeConn.on('close', () => {
         setStatus('error');
-        addLog('Connection lost.');
+        setStatusMsg('Disconnected.');
       });
     });
 
     newPeer.on('error', (err) => {
-      console.error('Peer Error:', err);
+      console.error('Peer error:', err);
       setStatus('error');
-      addLog(`Server Error: ${err.type}`);
+      setStatusMsg('Server error.');
     });
 
     setPeer(newPeer);
   };
 
-  // Initialize on mount
   useEffect(() => {
     initConnection();
     return () => {
@@ -118,12 +96,10 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
     if (!conn || status !== 'connected') return;
 
     setStatus('sending');
-    setStatusMsg('Compressing & Sending...');
+    setStatusMsg('Sending...');
 
     try {
       const compressedBlob = await compressImage(file);
-
-      // Keep the raw buffer fix which solves the loading issue
       const arrayBuffer = await compressedBlob.arrayBuffer();
 
       conn.send({
@@ -133,7 +109,7 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
       });
 
       setStatus('success');
-      setStatusMsg('Sent successfully!');
+      setStatusMsg('Sent!');
       setTimeout(() => {
         setStatus('connected');
         setStatusMsg('Ready to scan');
@@ -142,10 +118,11 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
     } catch (err) {
       console.error('Send error:', err);
       setStatus('error');
-      setStatusMsg('Failed to send.');
+      setStatusMsg('Failed.');
       setTimeout(() => setStatus('connected'), 3000);
     }
   };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       sendFile(e.target.files[0]);
@@ -174,29 +151,13 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
         {statusMsg}
       </p>
 
-      {(status === 'error' || status === 'linking') && (
-        <div className="flex flex-col items-center space-y-4 animate-in fade-in duration-700">
-          <button 
-            onClick={initConnection}
-            className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-xl text-sm font-bold flex items-center transition-all border border-slate-700"
-          >
-            <Wifi className="w-4 h-4 mr-2" /> Retry Connection
-          </button>
-          
-          <div className="max-w-xs text-[10px] text-slate-600 font-mono bg-black/20 p-3 rounded-lg border border-white/5 text-left overflow-hidden">
-            <p className="uppercase text-slate-500 font-black mb-1 border-b border-white/5 pb-1">Debug History</p>
-            {debugLog.map((log, i) => (
-              <p key={i} className="truncate">&gt;{log}</p>
-            ))}
-          </div>
-
-          {window.location.hostname === 'localhost' && (
-            <div className="max-w-xs bg-amber-500/10 border border-amber-500/20 p-3 rounded-lg text-left">
-              <p className="text-amber-500 text-[10px] font-black uppercase mb-1">Localhost Warning</p>
-              <p className="text-amber-500/60 text-[10px] leading-tight">You are on localhost. Your phone cannot reach this laptop unless you use your laptop's Local IP address in the URL.</p>
-            </div>
-          )}
-        </div>
+      {status === 'error' && (
+        <button 
+          onClick={initConnection}
+          className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all border border-slate-700"
+        >
+          Retry Link
+        </button>
       )}
 
       {status === 'connected' && (
@@ -217,7 +178,7 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
             className="w-full bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold py-6 rounded-2xl flex items-center justify-center transition-all border border-slate-700"
           >
             <Upload className="w-6 h-6 mr-3 text-slate-400" />
-            <span className="text-lg">Select from Gallery</span>
+            <span className="text-lg">Gallery</span>
           </button>
         </div>
       )}
@@ -225,12 +186,12 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
       {status === 'sending' && (
         <div className="fixed inset-0 bg-black/80 flex flex-col items-center justify-center z-50 backdrop-blur-sm">
           <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mb-6"></div>
-          <p className="text-white font-bold text-xl">Sending to Laptop...</p>
+          <p className="text-white font-bold text-xl">Sending...</p>
         </div>
       )}
       
       {status === 'linking' && (
-        <p className="text-slate-500 text-xs animate-pulse">Establishing secure P2P bridge...</p>
+        <p className="text-slate-500 text-xs animate-pulse">Establishing bridge...</p>
       )}
     </div>
   );
