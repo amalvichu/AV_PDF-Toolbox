@@ -68,7 +68,14 @@ export const ScanTool: React.FC = () => {
       setShowQR(false); 
       setConnectionLog('Phone Connected!');
 
+      // Send a welcome message to help the phone confirm the connection
+      conn.on('open', () => {
+        conn.send({ type: 'WELCOME' });
+      });
+
       conn.on('data', (data: any) => {
+        if (data.type === 'PONG') return; // Heartbeat
+        
         if (data.file) {
           setConnectionLog('File received!');
           // Convert array buffer back to blob

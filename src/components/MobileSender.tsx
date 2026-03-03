@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Peer from 'peerjs';
-import { Camera, Upload, Send, Wifi, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Camera, Upload, Send, Wifi, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
 
 interface MobileSenderProps {
   hostId: string;
@@ -14,6 +14,7 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const connectionTimeoutRef = useRef<any>(null);
 
   const compressImage = async (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
@@ -44,8 +45,10 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
 
   const initConnection = () => {
     if (peer) peer.destroy();
+    if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+    
     setStatus('linking');
-    setStatusMsg('Connecting...');
+    setStatusMsg('Connecting to P2P Cloud...');
 
     const newPeer = new Peer({
       host: '0.peerjs.com',
@@ -58,16 +61,34 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
       setStatusMsg('Searching for laptop...');
       const activeConn = newPeer.connect(hostId, { reliable: true });
 
+      // If connection doesn't open in 8 seconds, show retry
+      connectionTimeoutRef.current = setTimeout(() => {
+        if (status !== 'connected') {
+          setStatus('error');
+          setStatusMsg('Search timeout. Tap retry.');
+        }
+      }, 8000);
+
       activeConn.on('open', () => {
+        if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
         setConn(activeConn);
         setStatus('connected');
         setStatusMsg('Ready to scan');
       });
 
+      activeConn.on('data', (data: any) => {
+        if (data.type === 'WELCOME') {
+          if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+          setConn(activeConn);
+          setStatus('connected');
+          setStatusMsg('Ready to scan');
+        }
+      });
+
       activeConn.on('error', (err) => {
         console.error('Conn error:', err);
         setStatus('error');
-        setStatusMsg('Failed to link.');
+        setStatusMsg('Link failed.');
       });
 
       activeConn.on('close', () => {
@@ -89,6 +110,7 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
     initConnection();
     return () => {
       if (peer) peer.destroy();
+      if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
     };
   }, [hostId]);
 
@@ -151,12 +173,12 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
         {statusMsg}
       </p>
 
-      {status === 'error' && (
+      {(status === 'error' || status === 'linking') && (
         <button 
           onClick={initConnection}
-          className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all border border-slate-700"
+          className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-bold flex items-center transition-all shadow-xl active:scale-95"
         >
-          Retry Link
+          <RefreshCw className="w-5 h-5 mr-2" /> Retry Connection
         </button>
       )}
 
@@ -191,7 +213,9 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
       )}
       
       {status === 'linking' && (
-        <p className="text-slate-500 text-xs animate-pulse">Establishing bridge...</p>
+        <p className="text-slate-500 text-[10px] mt-4 max-w-[200px] leading-relaxed">
+          Establishing peer-to-peer bridge. If this takes too long, ensure the Scan tool is open on your laptop.
+        </p>
       )}
     </div>
   );
