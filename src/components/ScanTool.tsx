@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { usePDF } from '../hooks/usePDF';
-import { Camera, Upload, X, Plus, Download, Trash2, Zap, Smartphone, QrCode, Wifi, Monitor, Info } from 'lucide-react';
+import { Upload, X, Download, Trash2, Zap, Smartphone, Wifi, Monitor, Info } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import Peer from 'peerjs';
 
@@ -9,7 +9,6 @@ export const ScanTool: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [peerId, setPeerId] = useState('');
-  const [peer, setPeer] = useState<Peer | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'waiting' | 'connected'>('disconnected');
   const [connectionLog, setConnectionLog] = useState<string>('Initializing server...');
   

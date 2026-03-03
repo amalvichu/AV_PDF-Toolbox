@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { usePDF } from '../hooks/usePDF';
-import { UploadCloud, File as FileIcon, X, Minimize2, CheckCircle, ArrowDown } from 'lucide-react';
+import { File as FileIcon, X, Minimize2, CheckCircle, ArrowDown } from 'lucide-react';
 
 export const CompressPDFTool: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -71,7 +71,7 @@ export const CompressPDFTool: React.FC = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const savings = result ? (((result.originalSize - result.newSize) / result.originalSize) * 100).toFixed(1) : 0;
+  const savings = result ? (((result.originalSize - result.newSize) / result.originalSize) * 100).toFixed(1) : "0";
 
   return (
     <div className="w-full max-w-2xl mx-auto">

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { usePDF, ADMIN_KEY } from '../hooks/usePDF';
-import { File as FileIcon, X, Unlock, Lock, Key, ShieldCheck, Zap, AlertCircle, Loader2 } from 'lucide-react';
+import { File as FileIcon, X, Unlock, Lock, Key, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
 
 export const UnlockTool: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);

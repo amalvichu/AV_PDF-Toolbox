@@ -68,7 +68,7 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
       }
     });
 
-    newPeer.on('open', (id) => {
+    newPeer.on('open', () => {
       addLog('Linking to laptop...');
       const activeConn = newPeer.connect(hostId, { reliable: true });
 
@@ -95,7 +95,7 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
         }
       });
 
-      activeConn.on('error', (err) => {
+      activeConn.on('error', () => {
         setStatus('error');
         addLog('Link failed.');
       });

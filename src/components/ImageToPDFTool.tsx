@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { usePDF } from '../hooks/usePDF';
-import { UploadCloud, File as FileIcon, X, FileImage as ImageIcon, ArrowUp, ArrowDown } from 'lucide-react';
+import { UploadCloud, X, Image as ImageIcon, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface FileWithPreview extends File {
   preview?: string;

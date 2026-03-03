@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { usePDF } from '../hooks/usePDF';
-import { UploadCloud, File as FileIcon, X, Image as ImageIcon, Download } from 'lucide-react';
+import { UploadCloud, File as FileIcon, X, Image as ImageIcon } from 'lucide-react';
 
 export const PDFToImagesTool: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);

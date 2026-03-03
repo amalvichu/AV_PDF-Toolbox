@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { usePDF } from '../hooks/usePDF';
-import { UploadCloud, File as FileIcon, X, FileSpreadsheet, Download, CheckCircle2 } from 'lucide-react';
+import { X, FileSpreadsheet, Download, CheckCircle2 } from 'lucide-react';
 
 export const ExcelToPDFTool: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);

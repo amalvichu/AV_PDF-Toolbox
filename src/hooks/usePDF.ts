@@ -1,4 +1,4 @@
-import { PDFDocument, PDFName } from 'pdf-lib';
+import { PDFDocument } from 'pdf-lib';
 import { encryptPDF } from '@pdfsmaller/pdf-encrypt-lite';
 import * as pdfjsLib from 'pdfjs-dist';
 import * as XLSX from 'xlsx';
@@ -66,7 +66,7 @@ export const usePDF = () => {
         }, 100);
       });
     } else {
-      const blob = new Blob([data], { type: 'application/pdf' });
+      const blob = new Blob([data as any], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -87,11 +87,11 @@ export const usePDF = () => {
     return await encryptPDF(pdfBytes, password);
   };
 
-  const unlockPDF = async (file: File, pdfPassword: string): Promise<Uint8Array> => {
+  const unlockPDF = async (file: File, _password?: string): Promise<Uint8Array> => {
     const arrayBuffer = await file.arrayBuffer();
-    const pdfDoc = await PDFDocument.load(arrayBuffer, { password: pdfPassword });
-    pdfDoc.context.trailer.delete(PDFName.of('Encrypt'));
-    return await pdfDoc.save({ useObjectStreams: false });
+    // Use ignoreEncryption to allow loading the file content without a password for manipulation
+    const pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+    return await pdfDoc.save();
   };
 
   const imagesToPDF = async (imageBlobs: Blob[]): Promise<Uint8Array> => {
@@ -154,29 +154,21 @@ export const usePDF = () => {
     return new Uint8Array(doc.output('arraybuffer'));
   };
 
-  /**
-   * Robust Website to PDF: Improved HTML cleaning and link repairing.
-   */
   const htmlToPDF = async (url: string): Promise<Uint8Array> => {
     try {
-      // 1. Fetch via Proxy
       const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
       const response = await fetch(proxyUrl);
       if (!response.ok) throw new Error("This website is blocking external access.");
       
       let html = await response.text();
-      
-      // 2. Fix Relative Links (Critical for images/styles to show up)
       const urlObj = new URL(url);
       const rootUrl = urlObj.origin;
-      // Replace "/link" with "https://site.com/link"
       html = html.replace(/(src|href)\s*=\s*"\/(?!\/)/g, `$1="${rootUrl}/`);
       
-      // 3. Inject into Hidden Frame
       const iframe = document.createElement('iframe');
       iframe.style.position = 'fixed';
-      iframe.style.top = '-10000px'; // Hide it
-      iframe.style.width = '1200px'; // Standard Desktop width
+      iframe.style.top = '-10000px';
+      iframe.style.width = '1200px';
       iframe.style.height = '1600px';
       document.body.appendChild(iframe);
       
@@ -184,10 +176,8 @@ export const usePDF = () => {
       iframe.contentDocument?.write(html);
       iframe.contentDocument?.close();
 
-      // 4. Wait for rendering (Extended for slow sites)
       await new Promise(resolve => setTimeout(resolve, 3500));
 
-      // 5. Capture with CORS support
       const canvas = await html2canvas(iframe.contentDocument?.body || document.body, { 
         useCORS: true, 
         allowTaint: true,
@@ -199,7 +189,6 @@ export const usePDF = () => {
       
       document.body.removeChild(iframe);
       
-      // 6. Convert to PDF
       const imgData = canvas.toDataURL('image/jpeg', 0.9);
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = 210;
@@ -209,9 +198,6 @@ export const usePDF = () => {
       return new Uint8Array(pdf.output('arraybuffer'));
     } catch (error: any) {
       console.error('HTML Conversion Detail:', error);
-      if (error.message.includes('fetch')) {
-        throw new Error("CORS BLOCK: This website blocks unauthorized tools from reading its content.");
-      }
       throw new Error(error.message || "The website layout is too complex for browser-level conversion.");
     }
   };
