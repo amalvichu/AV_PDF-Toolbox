@@ -94,7 +94,7 @@ export const usePDF = () => {
     return await pdfDoc.save({ useObjectStreams: false });
   };
 
-  const reconstructPDFFromImages = async (imageBlobs: Blob[]): Promise<Uint8Array> => {
+  const imagesToPDF = async (imageBlobs: Blob[]): Promise<Uint8Array> => {
     const pdfDoc = await PDFDocument.create();
     for (const blob of imageBlobs) {
       const arrayBuffer = await blob.arrayBuffer();
@@ -216,5 +216,5 @@ export const usePDF = () => {
     }
   };
 
-  return { mergePDFs, splitPDF, downloadBlob, protectPDF, unlockPDF, pdfToImages, reconstructPDFFromImages, compressPDF, excelToPDF, htmlToPDF };
+  return { mergePDFs, splitPDF, downloadBlob, protectPDF, unlockPDF, pdfToImages, imagesToPDF, compressPDF, excelToPDF, htmlToPDF };
 };

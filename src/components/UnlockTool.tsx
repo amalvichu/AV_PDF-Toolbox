@@ -8,7 +8,7 @@ export const UnlockTool: React.FC = () => {
   const [pdfPassword, setPdfPassword] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [status, setStatus] = useState<string>('');
-  const { unlockPDF, pdfToImages, reconstructPDFFromImages, downloadBlob } = usePDF();
+  const { unlockPDF, pdfToImages, imagesToPDF, downloadBlob } = usePDF();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -54,7 +54,7 @@ export const UnlockTool: React.FC = () => {
         
         // 2. Re-build the PDF from the images
         setStatus('Re-building high-fidelity document...');
-        const reconstructedPdf = await reconstructPDFFromImages(imageBlobs);
+        const reconstructedPdf = await imagesToPDF(imageBlobs);
         
         downloadBlob(reconstructedPdf, `master-recovery-${file.name}`);
         setFile(null);

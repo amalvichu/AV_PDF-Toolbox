@@ -69,10 +69,22 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
         setStatusMsg('Ready to scan');
       });
 
-      activeConn.on('error', () => {
+      activeConn.on('error', (err) => {
+        console.error('Connection error:', err);
         setStatus('error');
         setStatusMsg('Link failed. Try refreshing.');
       });
+
+      activeConn.on('close', () => {
+        setStatus('error');
+        setStatusMsg('Connection closed by laptop.');
+      });
+    });
+
+    newPeer.on('error', (err) => {
+      console.error('Peer error:', err);
+      setStatus('error');
+      setStatusMsg(`Peer error: ${err.type}`);
     });
 
     setPeer(newPeer);

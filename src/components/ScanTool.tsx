@@ -65,6 +65,14 @@ export const ScanTool: React.FC = () => {
       setConnectionLog('Ready! Waiting for phone...');
     });
 
+    newPeer.on('error', (err) => {
+      console.error('Peer error:', err);
+      setConnectionLog(`Connection error: ${err.type}`);
+      if (err.type === 'peer-unavailable') {
+        setConnectionStatus('disconnected');
+      }
+    });
+
     newPeer.on('connection', (conn) => {
       setConnectionStatus('connected');
       setShowQR(false); 
@@ -82,7 +90,14 @@ export const ScanTool: React.FC = () => {
       });
 
       conn.on('close', () => {
-        setConnectionLog('Phone disconnected.');
+        setConnectionStatus('waiting');
+        setConnectionLog('Phone disconnected. Waiting...');
+      });
+      
+      conn.on('error', (err) => {
+        console.error('Connection error:', err);
+        setConnectionLog('Connection lost. Reconnecting...');
+        setConnectionStatus('waiting');
       });
     });
 
@@ -92,7 +107,10 @@ export const ScanTool: React.FC = () => {
 
   const getMobileUrl = () => {
     if (!peerId) return '';
-    const baseUrl = window.location.origin + window.location.pathname;
+    // Prioritize user-provided App URL for QR code
+    const baseUrl = (appBaseUrl && appBaseUrl.startsWith('http')) 
+      ? appBaseUrl 
+      : window.location.origin + window.location.pathname;
     const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
     return `${cleanBaseUrl}?mode=mobile-sender&hostId=${encodeURIComponent(peerId)}`;
   };
@@ -231,8 +249,15 @@ export const ScanTool: React.FC = () => {
             </button>
 
             <div className="text-center">
-              <div className="bg-white p-4 rounded-3xl inline-block mb-6 shadow-xl">
-                <QRCodeSVG value={getMobileUrl()} size={200} level="H" />
+              <div className="bg-white p-4 rounded-3xl inline-block mb-6 shadow-xl min-w-[232px] min-h-[232px] flex items-center justify-center">
+                {peerId ? (
+                  <QRCodeSVG value={getMobileUrl()} size={200} level="H" />
+                ) : (
+                  <div className="flex flex-col items-center justify-center space-y-3">
+                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Generating ID...</p>
+                  </div>
+                )}
               </div>
               
               <h3 className="text-2xl font-bold text-white mb-2">Scan with Phone</h3>
