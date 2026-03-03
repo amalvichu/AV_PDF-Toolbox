@@ -15,6 +15,7 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const connectionTimeoutRef = useRef<any>(null);
+  const pingIntervalRef = useRef<any>(null);
 
   const compressImage = async (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
@@ -46,9 +47,10 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
   const initConnection = () => {
     if (peer) peer.destroy();
     if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+    if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
     
     setStatus('linking');
-    setStatusMsg('Connecting to P2P Cloud...');
+    setStatusMsg('Connecting...');
 
     const newPeer = new Peer({
       host: '0.peerjs.com',
@@ -61,27 +63,34 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
       setStatusMsg('Searching for laptop...');
       const activeConn = newPeer.connect(hostId, { reliable: true });
 
-      // If connection doesn't open in 8 seconds, show retry
+      // Proactively send PING until we get WELCOME or PONG
+      pingIntervalRef.current = setInterval(() => {
+        try {
+          activeConn.send({ type: 'PING' });
+        } catch (e) {}
+      }, 1000);
+
       connectionTimeoutRef.current = setTimeout(() => {
         if (status !== 'connected') {
           setStatus('error');
           setStatusMsg('Search timeout. Tap retry.');
+          if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
         }
-      }, 8000);
+      }, 10000);
 
-      activeConn.on('open', () => {
+      const handleConnected = () => {
         if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+        if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
         setConn(activeConn);
         setStatus('connected');
         setStatusMsg('Ready to scan');
-      });
+      };
+
+      activeConn.on('open', handleConnected);
 
       activeConn.on('data', (data: any) => {
-        if (data.type === 'WELCOME') {
-          if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
-          setConn(activeConn);
-          setStatus('connected');
-          setStatusMsg('Ready to scan');
+        if (data.type === 'WELCOME' || data.type === 'PONG') {
+          handleConnected();
         }
       });
 
@@ -89,11 +98,13 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
         console.error('Conn error:', err);
         setStatus('error');
         setStatusMsg('Link failed.');
+        if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       });
 
       activeConn.on('close', () => {
         setStatus('error');
         setStatusMsg('Disconnected.');
+        if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       });
     });
 
@@ -111,6 +122,7 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
     return () => {
       if (peer) peer.destroy();
       if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+      if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
     };
   }, [hostId]);
 
@@ -173,7 +185,7 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
         {statusMsg}
       </p>
 
-      {(status === 'error' || status === 'linking') && (
+      {status === 'error' && (
         <button 
           onClick={initConnection}
           className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-bold flex items-center transition-all shadow-xl active:scale-95"
@@ -213,9 +225,15 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
       )}
       
       {status === 'linking' && (
-        <p className="text-slate-500 text-[10px] mt-4 max-w-[200px] leading-relaxed">
-          Establishing peer-to-peer bridge. If this takes too long, ensure the Scan tool is open on your laptop.
-        </p>
+        <div className="space-y-4">
+          <p className="text-slate-500 text-xs animate-pulse">Establishing bridge...</p>
+          <button 
+            onClick={initConnection}
+            className="text-blue-500 text-[10px] uppercase font-bold tracking-widest"
+          >
+            Cancel & Retry
+          </button>
+        </div>
       )}
     </div>
   );

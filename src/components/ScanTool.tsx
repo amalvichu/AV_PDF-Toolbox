@@ -68,13 +68,25 @@ export const ScanTool: React.FC = () => {
       setShowQR(false); 
       setConnectionLog('Phone Connected!');
 
-      // Send a welcome message to help the phone confirm the connection
-      conn.on('open', () => {
-        conn.send({ type: 'WELCOME' });
-      });
+      // Send WELCOME immediately - sometimes 'open' already happened
+      const sendWelcome = () => {
+        try {
+          conn.send({ type: 'WELCOME' });
+        } catch (e) {}
+      };
+
+      // Send multiple times to be sure
+      sendWelcome();
+      const welcomeInterval = setInterval(sendWelcome, 1000);
+      setTimeout(() => clearInterval(welcomeInterval), 5000);
+
+      conn.on('open', sendWelcome);
 
       conn.on('data', (data: any) => {
-        if (data.type === 'PONG') return; // Heartbeat
+        if (data.type === 'PING') {
+          conn.send({ type: 'PONG' });
+          return;
+        }
         
         if (data.file) {
           setConnectionLog('File received!');
