@@ -202,7 +202,7 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
         <div className="space-y-8 max-w-xs">
           <div className="flex flex-col items-center space-y-2">
             {logs.map((log, i) => (
-              <p key={i} className="text-[10px] text-slate-600 font-mono">>{log}</p>
+              <p key={i} className="text-[10px] text-slate-600 font-mono">&gt;{log}</p>
             ))}
           </div>
           
