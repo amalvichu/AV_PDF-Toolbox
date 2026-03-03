@@ -12,7 +12,7 @@ if (typeof window !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
 }
 
 // Global Admin Key for the Unlock feature
-export const ADMIN_KEY = "AV_ADMIN_2026"; 
+export const ADMIN_KEY = "0101"; 
 
 export const usePDF = () => {
   const mergePDFs = async (files: File[]): Promise<Uint8Array> => {
