@@ -1,13 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import Peer, { DataConnection } from 'peerjs';
-import { Camera, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Camera, Image as ImageIcon, Loader2, CheckCircle2, AlertCircle, Send, Wifi } from 'lucide-react';
 
 export const MobileSender: React.FC<{ hostId: string }> = ({ hostId }) => {
   const [status, setStatus] = useState<'searching' | 'connected' | 'error' | 'sending' | 'success'>('searching');
+  const [sentCount, setSentCount] = useState(0);
   const connection = useRef<DataConnection | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     if (!hostId) {
@@ -15,7 +13,6 @@ export const MobileSender: React.FC<{ hostId: string }> = ({ hostId }) => {
       return;
     }
 
-    // 1. Initialize Peer
     const peer = new Peer({
       config: {
         iceServers: [
@@ -27,12 +24,11 @@ export const MobileSender: React.FC<{ hostId: string }> = ({ hostId }) => {
     });
 
     peer.on('open', () => {
-      // 2. Connect to laptop
       const conn = peer.connect(hostId, { reliable: true });
       
       conn.on('open', () => {
         connection.current = conn;
-        // Wait for WELCOME from laptop to confirm sync
+        // The laptop will send a WELCOME signal to confirm the handshake
       });
 
       conn.on('data', (data: any) => {
@@ -47,121 +43,122 @@ export const MobileSender: React.FC<{ hostId: string }> = ({ hostId }) => {
 
     peer.on('error', () => setStatus('error'));
 
-    // 3. Start Camera
-    navigator.mediaDevices.getUserMedia({ 
-      video: { 
-        facingMode: 'environment',
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
-      } 
-    })
-      .then(stream => { 
-        streamRef.current = stream;
-        if (videoRef.current) videoRef.current.srcObject = stream; 
-      })
-      .catch(err => {
-        console.error(err);
-        setStatus('error');
-      });
-
-    return () => { 
-      peer.destroy(); 
-      streamRef.current?.getTracks().forEach(track => track.stop());
+    return () => {
+      peer.destroy();
     };
   }, [hostId]);
 
-  const snapDocument = () => {
-    if (!canvasRef.current || !videoRef.current || !connection.current || status !== 'connected') return;
-    
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || !connection.current || status !== 'connected') return;
+
     setStatus('sending');
-    const context = canvasRef.current.getContext('2d');
-    canvasRef.current.width = videoRef.current.videoWidth;
-    canvasRef.current.height = videoRef.current.videoHeight;
-    
-    if (context) {
-      context.drawImage(videoRef.current, 0, 0);
-      canvasRef.current.toBlob((blob) => {
-        if (blob) {
-          // 4. Send raw blob inside the payload wrapper
-          connection.current?.send({ type: 'IMAGE', payload: blob });
-          setStatus('success');
-          setTimeout(() => setStatus('connected'), 1500);
+    const fileList = Array.from(files);
+    let processed = 0;
+
+    fileList.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          connection.current?.send({ 
+            type: 'IMAGE', 
+            payload: event.target.result 
+          });
+          
+          processed++;
+          if (processed === fileList.length) {
+            setSentCount(prev => prev + fileList.length);
+            setStatus('success');
+            setTimeout(() => setStatus('connected'), 2000);
+          }
         }
-      }, 'image/jpeg', 0.85);
-    }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+    
+    // Clear input
+    e.target.value = '';
   };
 
   if (status === 'error') {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
-        <AlertCircle className="w-16 h-16 text-red-500 mb-4" />
-        <h2 className="text-xl font-bold text-white mb-2">Connection Failed</h2>
-        <p className="text-slate-400 mb-6 text-sm">Could not link to the laptop. Please refresh both devices and try again.</p>
-        <button onClick={() => window.location.reload()} className="bg-slate-800 text-white px-6 py-3 rounded-xl font-bold">Retry</button>
+        <AlertCircle className="w-20 h-20 text-red-500 mb-6" />
+        <h1 className="text-2xl font-black text-white mb-2 tracking-tighter">LINK EXPIRED</h1>
+        <p className="text-slate-500 mb-8 max-w-xs">The connection bridge was lost. Please refresh your laptop and rescan the code.</p>
+        <button onClick={() => window.location.reload()} className="bg-slate-800 text-white px-8 py-4 rounded-2xl font-bold uppercase tracking-widest text-xs">Retry</button>
+      </div>
+    );
+  }
+
+  if (status === 'searching') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+        <div className="relative mb-10">
+          <Loader2 className="w-24 h-24 text-blue-600 animate-spin" />
+          <Wifi className="w-8 h-8 text-blue-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+        </div>
+        <h1 className="text-3xl font-black text-white mb-2 tracking-tighter italic">SYNCING</h1>
+        <p className="text-slate-500 font-bold uppercase tracking-[0.3em] text-[10px]">Establishing Secure Bridge</p>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black flex flex-col overflow-hidden">
-      <video 
-        ref={videoRef} 
-        autoPlay 
-        playsInline 
-        muted
-        className="w-full h-full object-cover" 
-      />
-      <canvas ref={canvasRef} className="hidden" />
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500">
+      <div className={`mb-10 p-8 rounded-[3rem] transition-all duration-500 ${
+        status === 'success' ? 'bg-green-500/20 ring-8 ring-green-500/5' : 
+        status === 'sending' ? 'bg-blue-500/20 animate-pulse' : 
+        'bg-slate-900 shadow-2xl'
+      }`}>
+        {status === 'success' ? <CheckCircle2 className="w-24 h-24 text-green-500" /> :
+         status === 'sending' ? <Send className="w-24 h-24 text-blue-500" /> :
+         <SmartphoneIcon className="w-24 h-24 text-emerald-500" />}
+      </div>
 
-      {/* Header UI */}
-      <div className="absolute top-0 w-full p-6 bg-gradient-to-b from-black/80 to-transparent flex justify-between items-center">
-        <div>
-          <h1 className="text-white font-black tracking-tighter text-xl italic">REMOTE SCANNER</h1>
-          <div className="flex items-center mt-1">
-            <div className={`w-2 h-2 rounded-full mr-2 ${status === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></div>
-            <span className="text-[10px] text-white/60 font-bold uppercase tracking-widest">
-              {status === 'connected' ? 'Linked & Ready' : 'Establishing Secure Link...'}
-            </span>
-          </div>
+      <div className="mb-12">
+        <h1 className="text-4xl font-black text-white mb-2 tracking-tighter italic">CONNECTED</h1>
+        <div className="inline-flex items-center space-x-2 bg-emerald-500/10 px-4 py-1 rounded-full border border-emerald-500/20">
+          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+          <span className="text-emerald-400 text-[10px] font-black uppercase tracking-widest">
+            {sentCount} Pages Pushed
+          </span>
         </div>
       </div>
 
-      {/* Success Overlay */}
-      {status === 'success' && (
-        <div className="absolute inset-0 bg-emerald-500/20 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-300">
-          <div className="bg-emerald-500 p-4 rounded-full shadow-2xl animate-bounce">
-            <CheckCircle2 className="w-12 h-12 text-white" />
-          </div>
-          <p className="text-white font-black mt-4 text-2xl tracking-tighter italic">PAGE SENT!</p>
+      <div className="flex flex-col w-full space-y-6 max-w-sm">
+        {/* Opens Camera directly on mobile */}
+        <label className="group relative flex flex-col items-center justify-center bg-blue-600 active:scale-95 transition-all py-10 rounded-[2.5rem] cursor-pointer shadow-2xl shadow-blue-600/30 border-b-8 border-blue-800">
+          <Camera className="w-12 h-12 text-white mb-2" />
+          <span className="text-xl font-black text-white uppercase tracking-tighter">Snap Document</span>
+          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileUpload} />
+        </label>
+
+        {/* Opens Mobile Gallery */}
+        <label className="flex items-center justify-center bg-slate-900 active:bg-slate-800 transition-colors py-6 rounded-3xl cursor-pointer border border-slate-800 shadow-xl">
+          <ImageIcon className="w-6 h-6 text-slate-400 mr-3" />
+          <span className="text-lg font-bold text-slate-200">Gallery</span>
+          <input type="file" multiple accept="image/*" className="hidden" onChange={handleFileUpload} />
+        </label>
+      </div>
+
+      <p className="mt-12 text-slate-600 text-[10px] font-black uppercase tracking-widest max-w-[200px] leading-relaxed">
+        Images will appear instantly on your laptop waitlist.
+      </p>
+
+      {status === 'sending' && (
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center z-50 animate-in fade-in duration-200">
+          <Loader2 className="w-20 h-20 text-blue-500 animate-spin mb-6" />
+          <p className="text-white font-black text-2xl tracking-tighter italic">UPLOADING...</p>
         </div>
       )}
-
-      {/* Bottom Controls */}
-      <div className="absolute bottom-0 w-full p-10 bg-gradient-to-t from-black/80 to-transparent flex flex-col items-center">
-        {status === 'searching' ? (
-          <div className="flex flex-col items-center text-white space-y-4">
-            <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
-            <p className="text-sm font-bold uppercase tracking-[0.2em] opacity-60">Syncing with Laptop...</p>
-          </div>
-        ) : (
-          <div className="relative group">
-            <div className="absolute -inset-4 bg-blue-600/20 rounded-full blur-xl group-active:bg-blue-600/40 transition-all"></div>
-            <button 
-              onClick={snapDocument}
-              disabled={status === 'sending'}
-              className="relative w-24 h-24 bg-white rounded-full border-8 border-white/20 flex items-center justify-center active:scale-90 transition-transform shadow-2xl shadow-white/10"
-            >
-              <div className="w-16 h-16 rounded-full border-4 border-slate-900 flex items-center justify-center">
-                <Camera className="w-8 h-8 text-slate-900" />
-              </div>
-            </button>
-          </div>
-        )}
-        
-        <p className="mt-8 text-white/40 text-[10px] font-bold uppercase tracking-widest">
-          {status === 'connected' ? 'Tap to capture page' : 'Please wait...'}
-        </p>
-      </div>
     </div>
   );
 };
+
+const SmartphoneIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect width="14" height="20" x="5" y="2" rx="2" ry="2"/>
+    <path d="M12 18h.01"/>
+  </svg>
+);
