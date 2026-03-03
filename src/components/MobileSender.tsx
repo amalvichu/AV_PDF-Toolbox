@@ -55,20 +55,28 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
     setStatus('linking');
 
     const newPeer = new Peer({
-      debug: 2, // Moderate logging
+      host: '0.peerjs.com',
+      port: 443,
+      secure: true,
+      debug: 2,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' },
           { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
         ]
       }
     });
 
     newPeer.on('open', (id) => {
-      addLog(`Server ready. Searching for laptop...`);
+      addLog(`P2P ID: ${id.slice(0, 5)}...`);
+      addLog(`Searching for Laptop: ${hostId}`);
+      
       const activeConn = newPeer.connect(hostId, {
-        reliable: true,
-        serialization: 'binary'
+        reliable: true
       });
 
       activeConn.on('open', () => {
