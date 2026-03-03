@@ -178,7 +178,7 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
           <div className="max-w-xs text-[10px] text-slate-600 font-mono bg-black/20 p-3 rounded-lg border border-white/5 text-left overflow-hidden">
             <p className="uppercase text-slate-500 font-black mb-1 border-b border-white/5 pb-1">Debug History</p>
             {debugLog.map((log, i) => (
-              <p key={i} className="truncate">>{log}</p>
+              <p key={i} className="truncate">&gt;{log}</p>
             ))}
           </div>
 
