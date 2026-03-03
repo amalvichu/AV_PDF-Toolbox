@@ -10,12 +10,17 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
   const [peer, setPeer] = useState<Peer | null>(null);
   const [conn, setConn] = useState<any>(null);
   const [status, setStatus] = useState<'idle' | 'linking' | 'connected' | 'sending' | 'error' | 'success'>('linking');
-  const [statusMsg, setStatusMsg] = useState('Linking to laptop...');
+  const [statusMsg, setStatusMsg] = useState('Initializing P2P...');
+  const [debugLog, setDebugLog] = useState<string[]>([]);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  // Helper: Image Compression
+  const addLog = (msg: string) => {
+    setDebugLog(prev => [msg, ...prev].slice(0, 5));
+    setStatusMsg(msg);
+  };
+
   const compressImage = async (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -43,14 +48,14 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
     });
   };
 
-  // Initialize Peer and Handshake
-  useEffect(() => {
-    // Restore the config that worked for you
+  const initConnection = () => {
+    if (peer) peer.destroy();
+    
+    addLog('Connecting to cloud server...');
+    setStatus('linking');
+
     const newPeer = new Peer({
-      host: '0.peerjs.com',
-      port: 443,
-      secure: true,
-      debug: 1,
+      debug: 2, // Moderate logging
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
@@ -59,36 +64,46 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
       }
     });
 
-    newPeer.on('open', () => {
-      // Connect to the laptop
-      const activeConn = newPeer.connect(hostId, { reliable: true });
+    newPeer.on('open', (id) => {
+      addLog(`Server ready. Searching for laptop...`);
+      const activeConn = newPeer.connect(hostId, {
+        reliable: true,
+        serialization: 'binary'
+      });
 
       activeConn.on('open', () => {
         setConn(activeConn);
         setStatus('connected');
-        setStatusMsg('Ready to scan');
+        addLog('Connected to Laptop!');
       });
 
       activeConn.on('error', (err) => {
-        console.error('Connection error:', err);
+        console.error('Conn Error:', err);
         setStatus('error');
-        setStatusMsg('Link failed. Try refreshing.');
+        addLog('Link failed. Is the laptop tool open?');
       });
 
       activeConn.on('close', () => {
         setStatus('error');
-        setStatusMsg('Connection closed by laptop.');
+        addLog('Connection lost.');
       });
     });
 
     newPeer.on('error', (err) => {
-      console.error('Peer error:', err);
+      console.error('Peer Error:', err);
       setStatus('error');
-      setStatusMsg(`Peer error: ${err.type}`);
+      addLog(`Server Error: ${err.type}`);
     });
 
     setPeer(newPeer);
-    return () => newPeer.destroy();
+  };
+
+  // Initialize on mount
+  useEffect(() => {
+    initConnection();
+    return () => {
+      if (peer) peer.destroy();
+    };
   }, [hostId]);
 
   const sendFile = async (file: File) => {
@@ -150,6 +165,31 @@ export const MobileSender: React.FC<MobileSenderProps> = ({ hostId }) => {
       }`}>
         {statusMsg}
       </p>
+
+      {(status === 'error' || status === 'linking') && (
+        <div className="flex flex-col items-center space-y-4 animate-in fade-in duration-700">
+          <button 
+            onClick={initConnection}
+            className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-xl text-sm font-bold flex items-center transition-all border border-slate-700"
+          >
+            <Wifi className="w-4 h-4 mr-2" /> Retry Connection
+          </button>
+          
+          <div className="max-w-xs text-[10px] text-slate-600 font-mono bg-black/20 p-3 rounded-lg border border-white/5 text-left overflow-hidden">
+            <p className="uppercase text-slate-500 font-black mb-1 border-b border-white/5 pb-1">Debug History</p>
+            {debugLog.map((log, i) => (
+              <p key={i} className="truncate">>{log}</p>
+            ))}
+          </div>
+
+          {window.location.hostname === 'localhost' && (
+            <div className="max-w-xs bg-amber-500/10 border border-amber-500/20 p-3 rounded-lg text-left">
+              <p className="text-amber-500 text-[10px] font-black uppercase mb-1">Localhost Warning</p>
+              <p className="text-amber-500/60 text-[10px] leading-tight">You are on localhost. Your phone cannot reach this laptop unless you use your laptop's Local IP address in the URL.</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {status === 'connected' && (
         <div className="w-full max-w-sm space-y-6 animate-in slide-in-from-bottom-10 fade-in duration-500">

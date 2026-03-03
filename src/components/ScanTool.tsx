@@ -274,13 +274,24 @@ export const ScanTool: React.FC = () => {
                 <label className="block text-blue-400 text-[10px] font-bold uppercase tracking-widest mb-2 flex items-center">
                   <Monitor className="w-3 h-3 mr-2" /> App URL (Required)
                 </label>
-                <input 
-                  type="text" 
-                  value={appBaseUrl}
-                  onChange={(e) => setAppBaseUrl(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white text-sm font-mono focus:border-blue-500 focus:outline-none"
-                  placeholder="https://your-app.com/"
-                />
+                <div className="flex space-x-2">
+                  <input 
+                    type="text" 
+                    value={appBaseUrl}
+                    onChange={(e) => setAppBaseUrl(e.target.value)}
+                    className="flex-1 bg-slate-950 border border-slate-700 rounded-lg p-3 text-white text-sm font-mono focus:border-blue-500 focus:outline-none"
+                    placeholder="https://your-app.com/"
+                  />
+                  <button 
+                    onClick={() => {
+                      localStorage.setItem('av_pdf_toolbox_public_url', appBaseUrl);
+                      alert('URL Updated!');
+                    }}
+                    className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all"
+                  >
+                    Save
+                  </button>
+                </div>
                 <div className="mt-3 space-y-2">
                   <p className="text-slate-500 text-[10px] leading-relaxed">
                     <strong className="text-slate-300">Different Networks?</strong> (e.g. Phone SIM vs Laptop Wi-Fi): Use the <span className="text-blue-400">publicly deployed URL</span> of this app (like your GitHub Pages link).
