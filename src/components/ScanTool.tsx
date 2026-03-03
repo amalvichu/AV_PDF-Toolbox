@@ -64,23 +64,16 @@ export const ScanTool: React.FC = () => {
     });
 
     newPeer.on('connection', (conn) => {
-      setConnectionStatus('connected');
-      setShowQR(false); 
-      setConnectionLog('Phone Connected!');
+      setConnectionLog('Phone attempting to link...');
 
-      // Send WELCOME immediately - sometimes 'open' already happened
-      const sendWelcome = () => {
-        try {
-          conn.send({ type: 'WELCOME' });
-        } catch (e) {}
-      };
-
-      // Send multiple times to be sure
-      sendWelcome();
-      const welcomeInterval = setInterval(sendWelcome, 1000);
-      setTimeout(() => clearInterval(welcomeInterval), 5000);
-
-      conn.on('open', sendWelcome);
+      conn.on('open', () => {
+        setConnectionStatus('connected');
+        setShowQR(false); 
+        setConnectionLog('Phone Connected!');
+        
+        // Initial handshake
+        conn.send({ type: 'WELCOME' });
+      });
 
       conn.on('data', (data: any) => {
         if (data.type === 'PING') {
@@ -102,6 +95,20 @@ export const ScanTool: React.FC = () => {
         setConnectionStatus('waiting');
         setConnectionLog('Phone disconnected. Waiting...');
       });
+
+      conn.on('error', (err) => {
+        console.error('Conn error:', err);
+        setConnectionStatus('waiting');
+        setConnectionLog('Connection failed.');
+      });
+
+      // Timeout if connection doesn't open
+      setTimeout(() => {
+        if (conn.open === false) {
+          conn.close();
+          setConnectionLog('Handshake timed out.');
+        }
+      }, 10000);
     });
 
     setPeer(newPeer);
