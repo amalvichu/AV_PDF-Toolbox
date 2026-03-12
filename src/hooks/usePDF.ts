@@ -95,7 +95,8 @@ export const usePDF = () => {
   };
 
   const imagesToPDF = async (imageBlobs: Blob[]): Promise<Uint8Array> => {
-    const doc = new jsPDF();
+    // jsPDF unit is 'mm', format is 'a4' (210x297mm)
+    let doc: any = null;
     
     for (let i = 0; i < imageBlobs.length; i++) {
       const blob = imageBlobs[i];
@@ -105,21 +106,30 @@ export const usePDF = () => {
         const img = await new Promise<HTMLImageElement>((resolve, reject) => {
           const image = new Image();
           image.onload = () => resolve(image);
-          image.onerror = reject;
+          image.onerror = () => reject(new Error('Image failed to load'));
           image.src = imageUrl;
         });
 
-        // Use canvas to normalize the image and get dimensions
+        // Use canvas to normalize and potentially rotate/fix image data
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        if (!ctx) throw new Error('Could not get canvas context');
+        if (!ctx) throw new Error('Canvas context not available');
         
         canvas.width = img.width;
         canvas.height = img.height;
         ctx.drawImage(img, 0, 0);
         
-        // Convert to high-quality JPEG for the PDF
+        // Convert to high-quality JPEG
         const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        
+        // Determine orientation for this specific page
+        const orientation = img.width > img.height ? 'l' : 'p';
+        
+        if (!doc) {
+          doc = new jsPDF(orientation, 'mm', 'a4');
+        } else {
+          doc.addPage('a4', orientation);
+        }
         
         const pdfWidth = doc.internal.pageSize.getWidth();
         const pdfHeight = doc.internal.pageSize.getHeight();
@@ -131,16 +141,16 @@ export const usePDF = () => {
         const x = (pdfWidth - width) / 2;
         const y = (pdfHeight - height) / 2;
 
-        if (i > 0) doc.addPage();
-        doc.addImage(imgData, 'JPEG', x, y, width, height);
+        doc.addImage(imgData, 'JPEG', x, y, width, height, undefined, 'FAST');
       } catch (error) {
-        console.error('Failed to process image:', error);
-        throw new Error(`Failed to process image ${i + 1}. Please ensure it is a valid image file.`);
+        console.error(`Image processing error at index ${i}:`, error);
+        throw new Error(`Failed to process image ${i + 1}. Please ensure it is a valid JPEG or PNG file.`);
       } finally {
         URL.revokeObjectURL(imageUrl);
       }
     }
     
+    if (!doc) throw new Error('No images were provided to convert.');
     return new Uint8Array(doc.output('arraybuffer'));
   };
 
