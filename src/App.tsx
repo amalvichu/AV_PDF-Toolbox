@@ -121,7 +121,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const mode = params.get('mode');
-    const id = params.get('hostId');
+    const id = params.get('target') || params.get('hostId');
 
     if (mode === 'mobile-sender' && id) {
       setIsMobileMode(true);

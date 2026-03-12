@@ -98,7 +98,26 @@ export const usePDF = () => {
     const pdfDoc = await PDFDocument.create();
     for (const blob of imageBlobs) {
       const arrayBuffer = await blob.arrayBuffer();
-      const image = await pdfDoc.embedJpg(arrayBuffer);
+      let image;
+      try {
+        if (blob.type === 'image/png') {
+          image = await pdfDoc.embedPng(arrayBuffer);
+        } else {
+          image = await pdfDoc.embedJpg(arrayBuffer);
+        }
+      } catch (error) {
+        console.error(`Failed to embed image of type ${blob.type}:`, error);
+        // Fallback: try the other format just in case the MIME type is misleading
+        try {
+          if (blob.type === 'image/png') {
+            image = await pdfDoc.embedJpg(arrayBuffer);
+          } else {
+            image = await pdfDoc.embedPng(arrayBuffer);
+          }
+        } catch (secondError) {
+          throw new Error(`Failed to process image "${(blob as any).name || 'unknown'}". Please ensure it's a valid JPEG or PNG file.`);
+        }
+      }
       const { width, height } = image.scale(1);
       const page = pdfDoc.addPage([width, height]);
       page.drawImage(image, { x: 0, y: 0, width, height });
