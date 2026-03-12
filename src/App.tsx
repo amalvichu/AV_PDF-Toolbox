@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Merge, Split, FileImage, Shield, ArrowLeft, Minimize2, Image as ImageIcon, Unlock, FileSpreadsheet, Globe, Camera } from 'lucide-react';
+import { Merge, Split, FileImage, Shield, ArrowLeft, Minimize2, Image as ImageIcon, Unlock, FileSpreadsheet, Globe } from 'lucide-react';
 import { MergeTool } from './components/MergeTool';
 import { SplitTool } from './components/SplitTool';
 import { ImageToPDFTool } from './components/ImageToPDFTool';
@@ -10,16 +10,14 @@ import { PDFToImagesTool } from './components/PDFToImagesTool';
 import { UnlockTool } from './components/UnlockTool';
 import { ExcelToPDFTool } from './components/ExcelToPDFTool';
 import { HTMLToPDFTool } from './components/HTMLToPDFTool';
-import { ScanTool } from './components/ScanTool';
 import { MobileSender } from './components/MobileSender';
 
 // --- Types and Data ---
-type Tool = 'Merge' | 'Split' | 'Image to PDF' | 'Protect' | 'Compress' | 'PDF to Images' | 'Unlock' | 'Excel to PDF' | 'HTML to PDF' | 'Scan to PDF';
+type Tool = 'Merge' | 'Split' | 'Image to PDF' | 'Protect' | 'Compress' | 'PDF to Images' | 'Unlock' | 'Excel to PDF' | 'HTML to PDF';
 
 const toolData: { name: Tool; icon: React.ReactNode; description: string }[] = [
   { name: 'Merge', icon: <Merge className="w-8 h-8" />, description: 'Combine multiple PDFs into one.' },
   { name: 'Split', icon: <Split className="w-8 h-8" />, description: 'Extract pages from a PDF.' },
-  { name: 'Scan to PDF', icon: <Camera className="w-8 h-8" />, description: 'Capture pages from your phone camera.' },
   { name: 'Image to PDF', icon: <FileImage className="w-8 h-8" />, description: 'Convert images to a PDF file.' },
   { name: 'PDF to Images', icon: <ImageIcon className="w-8 h-8" />, description: 'Convert PDF pages into JPEG images.' },
   { name: 'Compress', icon: <Minimize2 className="w-8 h-8" />, description: 'Reduce the file size of a PDF.' },
@@ -39,7 +37,6 @@ const toolComponents: Record<Tool, React.FC> = {
   'Unlock': UnlockTool,
   'Excel to PDF': ExcelToPDFTool,
   'HTML to PDF': HTMLToPDFTool,
-  'Scan to PDF': ScanTool,
 };
 
 // --- Dashboard Component ---

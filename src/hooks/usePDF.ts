@@ -95,34 +95,53 @@ export const usePDF = () => {
   };
 
   const imagesToPDF = async (imageBlobs: Blob[]): Promise<Uint8Array> => {
-    const pdfDoc = await PDFDocument.create();
-    for (const blob of imageBlobs) {
-      const arrayBuffer = await blob.arrayBuffer();
-      let image;
+    const doc = new jsPDF();
+    
+    for (let i = 0; i < imageBlobs.length; i++) {
+      const blob = imageBlobs[i];
+      const imageUrl = URL.createObjectURL(blob);
+      
       try {
-        if (blob.type === 'image/png') {
-          image = await pdfDoc.embedPng(arrayBuffer);
-        } else {
-          image = await pdfDoc.embedJpg(arrayBuffer);
-        }
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const image = new Image();
+          image.onload = () => resolve(image);
+          image.onerror = reject;
+          image.src = imageUrl;
+        });
+
+        // Use canvas to normalize the image and get dimensions
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Could not get canvas context');
+        
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        
+        // Convert to high-quality JPEG for the PDF
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        
+        const pdfWidth = doc.internal.pageSize.getWidth();
+        const pdfHeight = doc.internal.pageSize.getHeight();
+        
+        // Calculate dimensions to fit the page while preserving aspect ratio
+        const ratio = Math.min(pdfWidth / img.width, pdfHeight / img.height);
+        const width = img.width * ratio;
+        const height = img.height * ratio;
+        const x = (pdfWidth - width) / 2;
+        const y = (pdfHeight - height) / 2;
+
+        if (i > 0) doc.addPage();
+        doc.addImage(imgData, 'JPEG', x, y, width, height);
       } catch (error) {
-        console.error(`Failed to embed image of type ${blob.type}:`, error);
-        // Fallback: try the other format just in case the MIME type is misleading
-        try {
-          if (blob.type === 'image/png') {
-            image = await pdfDoc.embedJpg(arrayBuffer);
-          } else {
-            image = await pdfDoc.embedPng(arrayBuffer);
-          }
-        } catch (secondError) {
-          throw new Error(`Failed to process image "${(blob as any).name || 'unknown'}". Please ensure it's a valid JPEG or PNG file.`);
-        }
+        console.error('Failed to process image:', error);
+        throw new Error(`Failed to process image ${i + 1}. Please ensure it is a valid image file.`);
+      } finally {
+        URL.revokeObjectURL(imageUrl);
       }
-      const { width, height } = image.scale(1);
-      const page = pdfDoc.addPage([width, height]);
-      page.drawImage(image, { x: 0, y: 0, width, height });
     }
-    return await pdfDoc.save();
+    
+    return new Uint8Array(doc.output('arraybuffer'));
   };
 
   const pdfToImages = async (file: File, password?: string): Promise<Blob[]> => {
